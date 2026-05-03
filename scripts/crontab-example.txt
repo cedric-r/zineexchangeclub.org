@@ -1,0 +1,12 @@
+# Crontab examples for Zine Exchange Club reminder scripts
+# Add these to your crontab using: crontab -e
+
+# Run posting reminder script every day at 9 AM
+# It will only send reminders if 14+ days have passed since pairing
+# and no reminder was sent in the last 7 days
+0 9 * * * /usr/bin/php /path/to/zineexchangeclub.org/scripts/reminder-posting.php
+
+# Run receiving reminder script every day at 10 AM
+# It will only send reminders if 14+ days have passed since zine was posted
+# and no reminder was sent in the last 7 days
+0 10 * * * /usr/bin/php /path/to/zineexchangeclub.org/scripts/reminder-receiving.php
