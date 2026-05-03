@@ -1,0 +1,119 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+<defs>
+  <!-- Top arc for curved text at r=410 -->
+  <path id="arcTop" d="M 102,512 A 410,410 0 0,1 922,512"/>
+  <!-- Clip cancellation lines to inner content circle -->
+  <clipPath id="innerClip">
+    <circle cx="512" cy="512" r="374"/>
+  </clipPath>
+</defs>
+
+<!-- Cream fill base -->
+<circle cx="512" cy="512" r="460" fill="#EFE0BE"/>
+
+<!-- ===== CANCELLATION LINES (red, diagonal) ===== -->
+<g clip-path="url(#innerClip)">
+  <line x1="88" y1="422" x2="936" y2="448" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+  <line x1="88" y1="474" x2="936" y2="500" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+  <line x1="88" y1="526" x2="936" y2="552" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+  <line x1="88" y1="578" x2="936" y2="604" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+  <line x1="88" y1="630" x2="936" y2="656" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+  <line x1="88" y1="682" x2="936" y2="708" stroke="#C42222" stroke-width="24" stroke-linecap="butt"/>
+</g>
+
+<!-- ===== ENVELOPE BODY ===== -->
+<rect x="308" y="436" width="396" height="264" rx="6" fill="#EFE0BE" stroke="#1A1A1A" stroke-width="8"/>
+
+<!-- Inner fold diamond lines -->
+<line x1="308" y1="436" x2="506" y2="568" stroke="#1A1A1A" stroke-width="3.5"/>
+<line x1="704" y1="436" x2="506" y2="568" stroke="#1A1A1A" stroke-width="3.5"/>
+<line x1="308" y1="700" x2="506" y2="568" stroke="#1A1A1A" stroke-width="3.5"/>
+<line x1="704" y1="700" x2="506" y2="568" stroke="#1A1A1A" stroke-width="3.5"/>
+
+<!-- Address lines -->
+<line x1="340" y1="596" x2="555" y2="596" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round"/>
+<line x1="340" y1="620" x2="524" y2="620" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round"/>
+<line x1="340" y1="644" x2="538" y2="644" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round"/>
+<line x1="340" y1="668" x2="492" y2="668" stroke="#1A1A1A" stroke-width="5" stroke-linecap="round"/>
+
+<!-- Postal stamp (upper right of envelope) - perforated border -->
+<rect x="610" y="454" width="76" height="92" rx="3" fill="white" stroke="#1A1A1A" stroke-width="3.5" stroke-dasharray="6,4.5"/>
+<!-- Stamp face -->
+<rect x="620" y="464" width="56" height="74" fill="#1A1A1A"/>
+<!-- Stamp text + lines -->
+<text x="648" y="492" fill="#EFE0BE" font-family="Georgia,'Times New Roman',serif" font-size="14" text-anchor="middle" font-weight="bold">ZEC</text>
+<line x1="626" y1="502" x2="668" y2="502" stroke="#EFE0BE" stroke-width="2.5"/>
+<line x1="626" y1="513" x2="662" y2="513" stroke="#EFE0BE" stroke-width="2.5"/>
+<line x1="626" y1="524" x2="665" y2="524" stroke="#EFE0BE" stroke-width="2.5"/>
+
+<!-- ===== ZINE PEEKING FROM ENVELOPE ===== -->
+<g transform="rotate(-8, 506, 440)">
+  <!-- Drop shadow -->
+  <rect x="457" y="294" width="108" height="152" rx="4" fill="#00000028" transform="translate(5,6)"/>
+  <!-- Zine body -->
+  <rect x="457" y="294" width="108" height="152" rx="4" fill="#EFE0BE" stroke="#1A1A1A" stroke-width="7"/>
+  <!-- Cover header bar -->
+  <rect x="465" y="304" width="92" height="32" fill="#1A1A1A" rx="2"/>
+  <text x="511" y="328" fill="#EFE0BE" font-family="Georgia,'Times New Roman',serif" font-size="15" text-anchor="middle" font-weight="bold">ZINE</text>
+  <!-- Content lines -->
+  <line x1="465" y1="350" x2="541" y2="350" stroke="#1A1A1A" stroke-width="4.5"/>
+  <line x1="465" y1="366" x2="532" y2="366" stroke="#1A1A1A" stroke-width="3.5"/>
+  <line x1="465" y1="380" x2="537" y2="380" stroke="#1A1A1A" stroke-width="3.5"/>
+  <!-- Red accent block -->
+  <rect x="465" y="396" width="42" height="36" fill="#C42222" rx="2"/>
+  <!-- Lines beside accent -->
+  <line x1="514" y1="403" x2="541" y2="403" stroke="#1A1A1A" stroke-width="3"/>
+  <line x1="514" y1="415" x2="537" y2="415" stroke="#1A1A1A" stroke-width="3"/>
+  <line x1="514" y1="427" x2="540" y2="427" stroke="#1A1A1A" stroke-width="3"/>
+  <!-- Staple marks -->
+  <rect x="500" y="294" width="5" height="13" fill="#888" rx="1"/>
+  <rect x="510" y="294" width="5" height="13" fill="#888" rx="1"/>
+</g>
+
+<!-- ===== ENVELOPE TOP FLAP (drawn over zine bottom) ===== -->
+<path d="M 308,436 L 506,556 L 704,436" fill="#E0CE9E" stroke="#1A1A1A" stroke-width="8" stroke-linejoin="round"/>
+
+<!-- ===== EXCHANGE ARROWS (below envelope) ===== -->
+<!-- Right-pointing arrow (left side) -->
+<g stroke="#C42222" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+  <line x1="348" y1="764" x2="424" y2="764"/>
+  <polyline points="403,748 424,764 403,780"/>
+</g>
+<!-- Left-pointing arrow (right side) -->
+<g stroke="#C42222" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+  <line x1="676" y1="764" x2="600" y2="764"/>
+  <polyline points="621,748 600,764 621,780"/>
+</g>
+<!-- Small envelope icons flanking the arrows -->
+<!-- Left mini envelope -->
+<rect x="296" y="750" width="42" height="30" rx="3" fill="none" stroke="#1A1A1A" stroke-width="4"/>
+<polyline points="296,750 317,766 338,750" fill="none" stroke="#1A1A1A" stroke-width="3.5" stroke-linejoin="round"/>
+<!-- Right mini envelope -->
+<rect x="686" y="750" width="42" height="30" rx="3" fill="none" stroke="#1A1A1A" stroke-width="4"/>
+<polyline points="686,750 707,766 728,750" fill="none" stroke="#1A1A1A" stroke-width="3.5" stroke-linejoin="round"/>
+
+<!-- ===== TEXT BAND RINGS ===== -->
+<circle cx="512" cy="512" r="444" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+<circle cx="512" cy="512" r="374" fill="none" stroke="#1A1A1A" stroke-width="3"/>
+
+<!-- ===== CURVED TOP TEXT: ZINE EXCHANGE CLUB ===== -->
+<text fill="#1A1A1A" font-size="50" font-weight="bold" letter-spacing="5"
+      font-family="Georgia,'Times New Roman',serif">
+  <textPath href="#arcTop" startOffset="50%" text-anchor="middle">ZINE EXCHANGE CLUB</textPath>
+</text>
+
+<!-- ===== BOTTOM BAND DECORATION ===== -->
+<!-- Flanking lines -->
+<line x1="326" y1="906" x2="392" y2="906" stroke="#1A1A1A" stroke-width="2.5"/>
+<line x1="632" y1="906" x2="698" y2="906" stroke="#1A1A1A" stroke-width="2.5"/>
+<!-- Red diamond accents -->
+<polygon points="408,906 418,895 428,906 418,917" fill="#C42222"/>
+<polygon points="596,906 606,895 616,906 606,917" fill="#C42222"/>
+<!-- ZEC initials -->
+<text x="512" y="913" fill="#1A1A1A" font-family="Georgia,'Times New Roman',serif" font-size="30"
+      text-anchor="middle" letter-spacing="24" font-weight="bold">Z E C</text>
+
+<!-- ===== OUTER PERFORATED STAMP BORDER ===== -->
+<circle cx="512" cy="512" r="460" fill="none" stroke="#1A1A1A" stroke-width="6" stroke-dasharray="18,13"/>
+
+</svg>

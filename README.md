@@ -1,0 +1,242 @@
+# Zine Exchange Club
+
+A zine exchange coordination system built in vanilla PHP. This platform allows zine creators to register, participate in exchange cycles, get paired with other participants, and track the exchange process.
+
+## Features
+
+- **User Registration**: Users can register with their personal information and zine details
+- **Email Confirmation**: Email verification for new registrations
+- **Cycle Management**: Administrators can create exchange cycles
+- **Round Robin Pairing**: Automatic pairing of participants with priority for same-country matches
+- **Process Tracking**: Participants can track their progress through each exchange cycle
+- **Email Notifications**: Automated emails at each stage of the process
+- **Gallery**: Photo gallery of received zines
+- **Admin Dashboard**: Complete admin interface for managing users, cycles, and monitoring progress
+- **Reminder System**: Crontab scripts to remind users about posting and receiving zines
+- **Mobile Responsive**: Airy, modern design that works on all devices
+
+## Requirements
+
+- PHP 7.4 or higher
+- MySQL 5.7 or higher / MariaDB 10.2 or higher
+- SMTP relay server (configured in config.php)
+- Web server (Apache recommended)
+
+## Installation
+
+### 1. Database Setup
+
+Create a MySQL database and import the schema:
+
+```bash
+mysql -u your_username -p zine_exchange_club < schema.sql
+```
+
+Or manually run the SQL commands in `schema.sql`.
+
+### 2. Configuration
+
+Edit `config.php` and update the following settings:
+
+```php
+// Database configuration
+define('DB_HOST', 'localhost');
+define('DB_NAME', 'zine_exchange_club');
+define('DB_USER', 'your_db_user');
+define('DB_PASS', 'your_db_password');
+
+// Email/SMTP configuration
+define('SMTP_HOST', '192.168.233.9');
+define('SMTP_PORT', 25);
+define('SMTP_FROM', 'zine@zineexchangeclub.org');
+define('SMTP_FROM_NAME', 'Zine Exchange Club');
+define('SITE_URL', 'http://yourdomain.com');
+
+// Admin configuration
+define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
+```
+
+### 3. File Permissions
+
+Set appropriate permissions:
+
+```bash
+# Make scripts executable
+chmod +x scripts/reminder-posting.php
+chmod +x scripts/reminder-receiving.php
+
+# Make uploads directory writable
+mkdir uploads
+chmod 755 uploads
+```
+
+### 4. Create Admin User
+
+You'll need to manually create an admin user in the database. Run this SQL:
+
+```sql
+INSERT INTO users (name, email, password, postal_address, accepts_adult_zines, country, is_admin, email_confirmed)
+VALUES (
+    'Admin Name',
+    'admin@zineexchangeclub.org',
+    '$2y$10$your_hashed_password_here',
+    'Admin Address',
+    0,
+    'Your Country',
+    1,
+    1
+);
+```
+
+Generate a password hash using PHP:
+```php
+<?php
+echo password_hash('your_password', PASSWORD_DEFAULT);
+```
+
+### 5. Configure Crontab
+
+Set up the reminder scripts in your crontab:
+
+```bash
+crontab -e
+```
+
+Add these lines (adjust paths as needed):
+
+```
+0 9 * * * /usr/bin/php /path/to/zineexchangeclub.org/scripts/reminder-posting.php
+0 10 * * * /usr/bin/php /path/to/zineexchangeclub.org/scripts/reminder-receiving.php
+```
+
+### 6. Web Server Configuration
+
+Ensure your web server is configured to serve PHP files. For Apache, ensure mod_php is enabled.
+
+The `.htaccess` file includes:
+- Security headers
+- Directory browsing disabled
+- Protection of sensitive files
+- Compression enabled
+- Upload size limits
+
+## Directory Structure
+
+```
+zineexchangeclub.org/
+├── admin/
+│   └── index.php              # Admin dashboard
+├── css/
+│   └── style.css             # Main stylesheet
+├── includes/
+│   ├── auth.php              # Authentication functions
+│   └── email.php             # Email sending functions
+├── scripts/
+│   ├── crontab-example.txt   # Example crontab configuration
+│   ├── reminder-posting.php  # Reminder for posting zines
+│   └── reminder-receiving.php # Reminder for receiving zines
+├── uploads/                  # Gallery images (create this directory)
+├── .htaccess                 # Apache configuration
+├── config.php                # Main configuration file
+├── confirm-email.php         # Email confirmation page
+├── confirm-participation.php # Participation confirmation page
+├── confirm-pairing.php       # Pairing confirmation page
+├── gallery.php               # Gallery page
+├── index.php                 # Home page
+├── login.php                 # Login page
+├── logout.php                # Logout handler
+├── process.php               # User process tracking page
+├── register.php              # Registration page
+├── schema.sql                # Database schema
+└── README.md                 # This file
+```
+
+## How It Works
+
+### The Exchange Process
+
+1. **Registration**: Users sign up and describe their zine (theme, format, construction type)
+2. **Cycle Creation**: Admin creates a new exchange cycle with a start date
+3. **Invitation**: Existing users receive email invitations to participate
+4. **Confirmation**: Users confirm their participation for the cycle
+5. **Pairing**: Admin pairs confirmed participants (round robin with country priority)
+6. **Pairing Notification**: Users receive emails with their partner's address
+7. **Sending**: Users send their zine and report it on the site
+8. **Notification**: Recipients are notified when a zine is posted to them
+9. **Receiving**: Users report when they receive their zine
+10. **Gallery**: Users can upload photos of received zines to the gallery
+
+### Pairing Algorithm
+
+The system uses a round-robin pairing algorithm with country priority:
+- Participants are grouped by country
+- Same-country pairs are created first
+- Remaining participants are paired cross-country
+- Each participant is paired with exactly one other person
+- The pairing forms a circle (A→B→C→...→A)
+
+### Email Notifications
+
+The system sends emails at these stages:
+- Registration confirmation
+- Cycle invitation
+- Pairing notification
+- Zine posted notification
+- Reminders for posting (2 weeks after pairing, then weekly)
+- Reminders for receiving (2 weeks after posting, then weekly)
+
+## Security Considerations
+
+- Passwords are hashed using PHP's `password_hash()`
+- Email confirmation required for registration
+- Session security configured
+- Sensitive files protected via .htaccess
+- SQL injection prevention using prepared statements
+- XSS prevention via output escaping
+
+## Customization
+
+### Styling
+
+Edit `css/style.css` to customize the appearance. The design uses:
+- Modern, airy layout
+- Mobile-first responsive design
+- Clean typography
+- Subtle animations
+
+### Email Templates
+
+Email templates are in `includes/email.php`. Customize the HTML to match your branding.
+
+### SMTP Configuration
+
+Update the SMTP settings in `config.php` to match your mail server.
+
+## Troubleshooting
+
+### Emails Not Sending
+
+- Verify SMTP server is accessible
+- Check PHP error logs
+- Ensure SMTP_HOST and SMTP_PORT are correct
+- Test SMTP connection manually
+
+### File Uploads Failing
+
+- Ensure `uploads/` directory exists and is writable
+- Check PHP upload_max_filesize and post_max_size settings
+- Verify file permissions
+
+### Session Issues
+
+- Check session save path permissions
+- Ensure session cookie settings are correct
+- Verify PHP session configuration
+
+## License
+
+This project is provided as-is for the Zine Exchange Club.
+
+## Support
+
+For issues or questions, contact the administrator at the email configured in `config.php`.
