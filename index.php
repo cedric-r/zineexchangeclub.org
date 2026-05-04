@@ -36,7 +36,7 @@ if (isLoggedIn()) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zine Exchange Club</title>
+    <title><?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -69,7 +69,7 @@ if (isLoggedIn()) {
         
         <main>
             <section class="hero">
-                <h1>Welcome to the Zine Exchange Club</h1>
+                <h1>Welcome to the <?php echo SITE_TITLE; ?></h1>
                 <p>Connect with fellow photography zine makers and exchange your creations with enthusiasts around the world.</p>
                 <?php if (!isLoggedIn()): ?>
                     <a href="register.php" class="btn btn-large">Join the Club</a>
@@ -149,8 +149,8 @@ if (isLoggedIn()) {
             </section>
             
             <section class="about">
-                <h2>About the Zine Exchange Club</h2>
-                <p>The Zine Exchange Club is a community for photography zine makers to share their work with fellow enthusiasts around the world. Our exchange cycles bring creators together, fostering connections and spreading the joy of independent publishing.</p>
+                <h2>About the <?php echo SITE_TITLE; ?></h2>
+                <p>The <?php echo SITE_TITLE; ?> is a community for photography zine makers to share their work with fellow enthusiasts around the world. Our exchange cycles bring creators together, fostering connections and spreading the joy of independent publishing.</p>
                 <p>Whether you make photocopied zines, hand-bound artist books, or anything in between, there's a place for you here. Join us and become part of a global network of zine creators!</p>
             </section>
         </main>

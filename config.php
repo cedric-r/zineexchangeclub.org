@@ -12,8 +12,14 @@ define('SMTP_FROM', 'zine@zineexchangeclub.org');
 define('SMTP_FROM_NAME', 'Zine Exchange Club');
 define('SITE_URL', 'http://localhost'); // Change to actual domain
 
+// Site configuration
+define('SITE_TITLE', 'Zine Exchange Club');
+
 // Admin configuration
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
+
+// Pairing algorithm configuration
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
 
 // Session configuration
 ini_set('session.cookie_httponly', 1);

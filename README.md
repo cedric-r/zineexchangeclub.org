@@ -7,7 +7,7 @@ A zine exchange coordination system built in vanilla PHP. This platform allows z
 - **User Registration**: Users can register with their personal information and zine details
 - **Email Confirmation**: Email verification for new registrations
 - **Cycle Management**: Administrators can create exchange cycles
-- **Round Robin Pairing**: Automatic pairing of participants with priority for same-country matches
+- **Plugin-Based Pairing**: Multiple pairing algorithms including random, country-based, and zine-type matching
 - **Process Tracking**: Participants can track their progress through each exchange cycle
 - **Email Notifications**: Automated emails at each stage of the process
 - **Gallery**: Photo gallery of received zines
@@ -51,6 +51,12 @@ define('SMTP_PORT', 25);
 define('SMTP_FROM', 'zine@zineexchangeclub.org');
 define('SMTP_FROM_NAME', 'Zine Exchange Club');
 define('SITE_URL', 'http://yourdomain.com');
+
+// Site configuration
+define('SITE_TITLE', 'Zine Exchange Club');
+
+// Pairing algorithm configuration
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
 
 // Admin configuration
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
@@ -159,21 +165,49 @@ zineexchangeclub.org/
 2. **Cycle Creation**: Admin creates a new exchange cycle with a start date
 3. **Invitation**: Existing users receive email invitations to participate
 4. **Confirmation**: Users confirm their participation for the cycle
-5. **Pairing**: Admin pairs confirmed participants (round robin with country priority)
+5. **Pairing**: Admin pairs confirmed participants using the selected algorithm
 6. **Pairing Notification**: Users receive emails with their partner's address
 7. **Sending**: Users send their zine and report it on the site
 8. **Notification**: Recipients are notified when a zine is posted to them
 9. **Receiving**: Users report when they receive their zine
 10. **Gallery**: Users can upload photos of received zines to the gallery
 
-### Pairing Algorithm
+### Pairing Algorithms
 
-The system uses a round-robin pairing algorithm with country priority:
-- Participants are grouped by country
-- Same-country pairs are created first
-- Remaining participants are paired cross-country
-- Each participant is paired with exactly one other person
-- The pairing forms a circle (A→B→C→...→A)
+The system features a plugin-based pairing system with multiple algorithms:
+
+#### Available Algorithms:
+
+1. **Random** (Default)
+   - Completely random pairing of all participants
+   - Maximum variety in exchanges
+
+2. **Country Priority**
+   - Prioritizes pairing participants within the same country
+   - Falls back to cross-country pairing for remaining participants
+
+3. **Sequential**
+   - Pairs participants in order of their registration date
+   - Predictable pairing order
+
+4. **Zine Type**
+   - Groups participants by zine format (folded, stapled, bound, other)
+   - Prioritizes pairing similar zine types
+   - Falls back to random pairing for remaining participants
+
+5. **Country + Zine Type**
+   - Highest priority: Same country AND same zine format
+   - Falls back through: Same country → Same format → Random
+   - Most specific matching algorithm
+
+#### Configuration:
+Set the desired algorithm in `config.php`:
+```php
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
+```
+
+#### Adding New Algorithms:
+New pairing algorithms can be added by implementing the `PairingAlgorithm` interface in `includes/pairing_algorithms.php` and updating the factory.
 
 ### Email Notifications
 
@@ -195,6 +229,21 @@ The system sends emails at these stages:
 - XSS prevention via output escaping
 
 ## Customization
+
+### Site Title
+
+Change the site title by updating the `SITE_TITLE` constant in `config.php`:
+```php
+define('SITE_TITLE', 'Your Zine Exchange Name');
+```
+This will update the site name throughout all pages and emails.
+
+### Pairing Algorithm
+
+Select your preferred pairing algorithm in `config.php`:
+```php
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
+```
 
 ### Styling
 
