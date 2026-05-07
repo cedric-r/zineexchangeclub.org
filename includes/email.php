@@ -107,8 +107,8 @@ function getRegistrationEmail($name, $confirmationToken) {
     </head>
     <body>
         <div class='container'>
-            <h2>Welcome to Zine Exchange Club, $name!</h2>
-            <p>Thank you for registering with the Zine Exchange Club. We're excited to have you join our community of zine creators and enthusiasts.</p>
+            <h2>Welcome to " . SITE_TITLE . ", $name!</h2>
+            <p>Thank you for registering with the " . SITE_TITLE . ". We're excited to have you join our community of zine creators and enthusiasts.</p>
             
             <h3>How it works:</h3>
             <ol>
@@ -128,7 +128,7 @@ function getRegistrationEmail($name, $confirmationToken) {
             <p>Once you've confirmed your email, you'll be able to participate in upcoming exchange cycles.</p>
             
             <p>Happy zine making!</p>
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -165,7 +165,7 @@ function getCycleInvitationEmail($name, $cycleName, $confirmationToken) {
             <p>If you don't want to participate in this cycle, simply ignore this email. Your account will remain active for future cycles.</p>
             
             <p>Happy zine exchanging!</p>
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -216,7 +216,7 @@ function getPairingEmail($name, $partnerName, $partnerAddress, $confirmationToke
             <p>$confirmUrl</p>
             
             <p>Happy zine exchanging!</p>
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -247,7 +247,7 @@ function getZinePostedEmail($name) {
             </ol>
             
             <p>Enjoy your new zine!</p>
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -278,7 +278,7 @@ function getReminderEmail($name, $reminderType) {
             
             <p>If you have any questions or issues, please don't hesitate to contact us.</p>
             
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -314,7 +314,7 @@ function getPasswordResetEmail($name, $token) {
             
             <p>For security reasons, please don't share this link with anyone.</p>
             
-            <p>The Zine Exchange Club Team</p>
+            <p>The " . SITE_TITLE . " Team</p>
         </div>
     </body>
     </html>
@@ -351,11 +351,11 @@ function getParticipationReminderEmail($name, $cycleName) {
                 
                 <p>This is a friendly reminder that you haven't yet confirmed your participation in the <strong>$cycleName</strong> exchange cycle.</p>
                 
-                <p>If you'd like to participate in this cycle and exchange zines with fellow creators, please confirm your participation by clicking the button below:</p>
+                <p>If you'd like to participate in this cycle and exchange zines with fellow creators, Please confirm Your participation by clicking the button below:</p>
                 
                 <a href='$confirmUrl' class='button'>Confirm My Participation</a>
                 
-                <p>If you don't wish to participate in this cycle, no action is needed. You simply won't be included in the pairing.</p>
+                <p>If you don't wish to participate in this cycle, No action is needed. You simply won't be included in the pairing.</p>
                 
                 <p><strong>Important:</strong> Participation confirmation is required to be paired with another participant for the exchange.</p>
                 
@@ -363,10 +363,64 @@ function getParticipationReminderEmail($name, $cycleName) {
                 
                 <p>Happy zine making!</p>
                 
-                <p>The Zine Exchange Club Team</p>
+                <p>The " . SITE_TITLE . " Team</p>
             </div>
             <div class='footer'>
-                <p>This email was sent to you because you're registered for the Zine Exchange Club.</p>
+                <p>This email was sent to you because you're registered for the " . SITE_TITLE . ".</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    ";
+}
+
+function getAnnouncementEmail($name, $announcementTitle, $announcementContent) {
+    $announcementsUrl = SITE_URL . '/announcements.php';
+    $announcementContent = nl2br(htmlspecialchars($announcementContent));
+    
+    return "
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset='UTF-8'>
+        <meta name='viewport' content='width=device-width, initial-scale=1.0'>
+        <title>New Announcement</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .header { background: #2c3e50; color: white; padding: 20px; text-align: center; }
+            .content { padding: 20px; background: #f8f9fa; }
+            .button { display: inline-block; padding: 12px 30px; background: #3498db; color: white; text-decoration: none; border-radius: 6px; margin: 20px 0; }
+            .button:hover { background: #2980b9; }
+            .footer { text-align: center; padding: 20px; color: #7f8c8d; font-size: 0.9em; }
+        </style>
+    </head>
+    <body>
+        <div class='container'>
+            <div class='header'>
+                <h1>New Announcement</h1>
+            </div>
+            <div class='content'>
+                <h2>Hello $name!</h2>
+                
+                <p>A new announcement has been posted to the " . SITE_TITLE . ":</p>
+                
+                <div style='background: #e9ecef; padding: 15px; border-radius: 5px; margin: 20px 0;'>
+                    <h3 style='margin: 0 0 10px 0; color: #2c3e50;'>$announcementTitle</h3>
+                </div>
+                
+                <div style='background: white; padding: 15px; border-radius: 5px; margin: 0 0 20px 0;'>
+                    <p style='margin: 0;'>$announcementContent</p>
+                </div>
+                
+                <p>You can view this and all other announcements by clicking the button below:</p>
+                
+                <a href='$announcementsUrl' class='button'>View All Announcements</a>
+                
+                <p>This notification was sent to all registered members of the " . SITE_TITLE . ".</p>
+            </div>
+            <div class='footer'>
+                <p>This email was sent to you because you're registered for the " . SITE_TITLE . ".</p>
             </div>
         </div>
     </body>

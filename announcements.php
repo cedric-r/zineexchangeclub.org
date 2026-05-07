@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'includes/auth.php';
+require_once 'includes/email.php';
 
 requireLogin();
 
@@ -24,16 +25,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
                 $message = 'Failed to add announcement.';
                 $messageType = 'error';
             }
-        } else {
-            $message = 'Title and content are required.';
-            $messageType = 'error';
         }
     }
-    
     if (isset($_POST['edit_announcement'])) {
         $announcementId = (int)$_POST['announcement_id'];
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
+        $sendToAll = isset($_POST['send_to_all']) ? 1 : 0;
         
         if ($title && $content) {
             try {
@@ -41,8 +39,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
                 $stmt->execute([$title, $content, $announcementId]);
                 $message = 'Announcement updated successfully!';
                 $messageType = 'success';
+                
+                // If send_to_all is checked, send email to all registered users
+                if ($sendToAll) {
+                    // Get all registered users
+                    $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
+                    $stmt->execute();
+                    $users = $stmt->fetchAll();
+                    
+                    $emailCount = 0;
+                    foreach ($users as $user) {
+                        $emailBody = getAnnouncementEmail($user['name'], $title, $content);
+                        if (sendEmail($user['email'], 'New Announcement: ' . $title, $emailBody)) {
+                            $emailCount++;
+                            logEmail($user['id'], null, 'announcement_notification');
+                        }
+                    }
+                    
+                    $message .= " Announcement sent to {$emailCount} registered users.";
+                }
             } catch (Exception $e) {
-                $message = 'Failed to update announcement.';
+                $message = 'Failed to update announcement. Error: ' . $e->getMessage();
                 $messageType = 'error';
             }
         } else {
@@ -92,6 +109,42 @@ if (!empty($announcementIds)) {
     }
     $stmt->execute($params);
 }
+    
+    // Handle sending announcement to all users
+    if (isset($_POST['send_announcement_to_all'])) {
+        $announcementId = (int)$_POST['announcement_id'];
+        
+        // Get announcement details
+        $stmt = $db->prepare("SELECT a.title, a.content FROM announcements a WHERE a.id = ?");
+        $stmt->execute([$announcementId]);
+        $announcement = $stmt->fetch();
+        
+        if (!$announcement) {
+            $message = 'Announcement not found.';
+            $messageType = 'error';
+        } else {
+            // Get all registered users
+            $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
+            $stmt->execute();
+            $users = $stmt->fetchAll();
+            
+            $emailCount = 0;
+            foreach ($users as $user) {
+                $emailBody = getAnnouncementEmail($user['name'], $announcement['title'], $announcement['content']);
+                if (sendEmail($user['email'], 'New Announcement: ' . $announcement['title'], $emailBody)) {
+                    $emailCount++;
+                    logEmail($user['id'], null, 'announcement_notification');
+                }
+            }
+            
+            $message = "Announcement sent to {$emailCount} registered users.";
+            $messageType = 'success';
+            
+            // Mark announcement as sent to all users
+            $stmt = $db->prepare("UPDATE announcements SET email_sent = 1 WHERE id = ?");
+            $stmt->execute([$announcementId]);
+        }
+    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -140,6 +193,10 @@ if (!empty($announcementIds)) {
                                 <label for="content">Content *</label>
                                 <textarea id="content" name="content" required rows="6" placeholder="Enter announcement content"></textarea>
                             </div>
+                            <div class="form-group checkbox">
+                                <input type="checkbox" id="send_to_all" name="send_to_all" value="1">
+                                <label for="send_to_all">Send to all registered users</label>
+                            </div>
                             <button type="submit" name="add_announcement" class="btn">Add Announcement</button>
                         </form>
                     </div>
@@ -162,6 +219,9 @@ if (!empty($announcementIds)) {
                                     <?php if ($announcement['updated_at'] !== $announcement['created_at']): ?>
                                         <span class="updated">Updated: <?php echo date('F j, Y g:i A', strtotime($announcement['updated_at'])); ?></span>
                                     <?php endif; ?>
+                                    <?php if ($announcement['email_sent']): ?>
+                                        <span class="email-sent">Email sent to all users</span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="announcement-content">
@@ -170,8 +230,11 @@ if (!empty($announcementIds)) {
                             
                             <?php if (isAdmin()): ?>
                                 <div class="announcement-actions">
-                                    <button class="btn-small" onclick="editAnnouncement(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title']); ?>', '<?php echo htmlspecialchars($announcement['content'], ENT_QUOTES); ?>')">Edit</button>
+                                    <button class="btn-small" onclick="editAnnouncement(this)" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES); ?>" data-content="<?php echo htmlspecialchars($announcement['content'], ENT_QUOTES); ?>">Edit</button>
                                     <button class="btn-small btn-danger" onclick="deleteAnnouncement(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title']); ?>')">Delete</button>
+                                    <?php if (!$announcement['email_sent']): ?>
+                                        <button class="btn-small" onclick="sendAnnouncementToAll(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title']); ?>')">Send to All Users</button>
+                                    <?php endif; ?>
                                 </div>
                             <?php endif; ?>
                         </article>
@@ -201,13 +264,20 @@ if (!empty($announcementIds)) {
                         <label for="edit_content">Content *</label>
                         <textarea id="edit_content" name="content" required rows="6"></textarea>
                     </div>
+                    <div class="form-group checkbox">
+                        <input type="checkbox" id="edit_send_to_all" name="send_to_all" value="1">
+                        <label for="edit_send_to_all">Send to all registered users</label>
+                    </div>
                     <button type="submit" name="edit_announcement" class="btn">Update Announcement</button>
                 </form>
             </div>
         </div>
         
         <script>
-            function editAnnouncement(id, title, content) {
+            function editAnnouncement(button) {
+                const id = button.getAttribute('data-id');
+                const title = button.getAttribute('data-title');
+                const content = button.getAttribute('data-content');
                 document.getElementById('edit_announcement_id').value = id;
                 document.getElementById('edit_title').value = title;
                 document.getElementById('edit_content').value = content;
@@ -219,10 +289,20 @@ if (!empty($announcementIds)) {
             }
             
             function deleteAnnouncement(id, title) {
-                if (confirm('Are you sure you want to delete the announcement "' + title + '"? This action cannot be undone.')) {
+                if (confirm('Are you sure you want to delete announcement "' + title + '"? This action cannot be undone.')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
                     form.innerHTML = '<input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="delete_announcement" value="1">';
+                    document.body.appendChild(form);
+                    form.submit();
+                }
+            }
+            
+            function sendAnnouncementToAll(id, title) {
+                if (confirm('Are you sure you want to send this announcement to all registered users: "' + title + '"?')) {
+                    const form = document.createElement('form');
+                    form.method = 'POST';
+                    form.innerHTML = '<input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="send_announcement_to_all" value="1">';
                     document.body.appendChild(form);
                     form.submit();
                 }

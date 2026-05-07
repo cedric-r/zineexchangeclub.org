@@ -261,9 +261,26 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                         </div>
                     <?php endforeach; ?>
                 </section>
+        <!-- Contact Administrator Section -->
+        <section class="contact-section">
+            <div class="container">
+                <div class="contact-card">
+                    <h2>Need Help?</h2>
+                    <div class="contact-box">
+                        <h3>Contact Administrator</h3>
+                        <p>If you have any questions or issues with the zine exchange process, please contact the administrator:</p>
+                        <div class="contact-details">
+                            <p><strong>Email:</strong> <a href="mailto:<?php echo htmlspecialchars(ADMIN_EMAIL); ?>"><?php echo htmlspecialchars(ADMIN_EMAIL); ?></a></p>
+                            <p><strong>Response Time:</strong> We'll respond to your inquiry within 24-48 hours.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
             <?php endif; ?>
         </main>
-        
+               
         <?php require_once 'includes/footer.php'; ?>
     </div>
 </body>

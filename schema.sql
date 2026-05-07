@@ -89,8 +89,12 @@ CREATE TABLE announcements (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     created_by INT NOT NULL,
+    email_sent TINYINT(1) DEFAULT 0,
     FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
+
+CREATE INDEX idx_announcements_created ON announcements(created_at DESC);
+CREATE INDEX idx_announcements_email_sent ON announcements(email_sent);
 
 CREATE INDEX idx_announcements_created ON announcements(created_at DESC);
 

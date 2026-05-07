@@ -238,16 +238,22 @@ define('SITE_TITLE', 'Your Zine Exchange Name');
 ```
 This will update the site name throughout all pages and emails.
 
-### Pairing Algorithm
+### Announcement Management
 
-Select your preferred pairing algorithm in `config.php`:
-```php
-define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
-```
+Administrators can send announcements to all registered members with the following options:
+
+- **Automatic Sending**: When creating or editing an announcement, check "Send to all registered users" to immediately email all confirmed users
+- **Manual Sending**: For announcements that weren't sent initially, administrators can click "Send to All Users" button next to each announcement
+- **Email Tracking**: The system tracks which announcements have been sent to prevent duplicate emails
+- **Email Content**: Uses the site title from `SITE_TITLE` configuration for consistent branding
+
+### SMTP Configuration
+
+Update SMTP settings in `config.php` to match your mail server.
 
 ### Styling
 
-Edit `css/style.css` to customize the appearance. The design uses:
+Edit `css/style.css` to customize appearance. The design uses:
 - Modern, airy layout
 - Mobile-first responsive design
 - Clean typography
@@ -257,9 +263,18 @@ Edit `css/style.css` to customize the appearance. The design uses:
 
 Email templates are in `includes/email.php`. Customize the HTML to match your branding.
 
+### Announcement Notifications
+
+Administrators can send announcements to all registered members with the following options:
+
+- **Automatic Sending**: When creating or editing an announcement, check "Send to all registered users" to immediately email all confirmed users
+- **Manual Sending**: For announcements that weren't sent initially, administrators can click "Send to All Users" button next to each announcement
+- **Email Tracking**: The system tracks which announcements have been sent to prevent duplicate emails
+- **Email Content**: Uses the site title from `SITE_TITLE` configuration for consistent branding
+
 ### SMTP Configuration
 
-Update the SMTP settings in `config.php` to match your mail server.
+Update SMTP settings in `config.php` to match your mail server.
 
 ## Troubleshooting
 

@@ -3,6 +3,7 @@ require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/email.php';
 require_once '../includes/functions.php';
+require_once '../includes/pairing_algorithms.php';
 
 requireAdmin();
 
@@ -174,36 +175,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['send_reminder'])) {
         $cycleId = (int)$_POST['cycle_id'];
         
-        try {
-            // Get users who haven't confirmed participation
-            $stmt = $db->prepare("
-                SELECT u.name, u.email 
-                FROM users u
-                JOIN cycle_participations cp ON u.id = cp.user_id
-                WHERE cp.cycle_id = ? AND cp.participation_confirmed = 0 AND cp.wants_to_participate = 1
-            ");
-            $stmt->execute([$cycleId]);
-            $unconfirmedUsers = $stmt->fetchAll();
+        // Get users who haven't confirmed participation but want to participate
+        $stmt = $db->prepare("
+            SELECT u.name, u.email 
+            FROM users u
+            JOIN cycle_participations cp ON u.id = cp.user_id
+            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 0 AND cp.wants_to_participate = 1
+        ");
+        $stmt->execute([$cycleId]);
+        $unconfirmedUsers = $stmt->fetchAll();
+        
+        // Get cycle info
+        $stmt = $db->prepare("SELECT name FROM cycles WHERE id = ?");
+        $stmt->execute([$cycleId]);
+        $cycle = $stmt->fetch();
+        
+        $reminderCount = 0;
+        foreach ($unconfirmedUsers as $user) {
+            $emailBody = getParticipationReminderEmail($user['name'], $cycle['name']);
+            if (sendEmail($user['email'], 'Participation Reminder: ' . $cycle['name'], $emailBody)) {
+                $reminderCount++;
+                logEmail($user['id'], $cycleId, 'participation_reminder');
+            }
+        }
+        
+        $message = "Reminders sent to {$reminderCount} user(s) who haven't confirmed participation.";
+        $messageType = 'success';
+    }
+    
+    if (isset($_POST['send_announcement'])) {
+        $announcementId = (int)$_POST['announcement_id'];
+        
+        // Get announcement details
+        $stmt = $db->prepare("SELECT a.title, a.content FROM announcements a WHERE a.id = ?");
+        $stmt->execute([$announcementId]);
+        $announcement = $stmt->fetch();
+        
+        if (!$announcement) {
+            $message = 'Announcement not found.';
+            $messageType = 'error';
+        } else {
+            // Get all registered users
+            $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
+            $stmt->execute();
+            $users = $stmt->fetchAll();
             
-            // Get cycle info
-            $stmt = $db->prepare("SELECT name FROM cycles WHERE id = ?");
-            $stmt->execute([$cycleId]);
-            $cycle = $stmt->fetch();
-            
-            $reminderCount = 0;
-            foreach ($unconfirmedUsers as $user) {
-                $emailBody = getParticipationReminderEmail($user['name'], $cycle['name']);
-                if (sendEmail($user['email'], 'Participation Reminder: ' . $cycle['name'], $emailBody)) {
-                    $reminderCount++;
-                    logEmail($user['id'], $cycleId, 'participation_reminder');
+            $emailCount = 0;
+            foreach ($users as $user) {
+                $emailBody = getAnnouncementEmail($user['name'], $announcement['title'], $announcement['content']);
+                if (sendEmail($user['email'], 'New Announcement: ' . $announcement['title'], $emailBody)) {
+                    $emailCount++;
+                    logEmail($user['id'], null, 'announcement_notification');
                 }
             }
             
-            $message = "Reminders sent to {$reminderCount} user(s) who haven't confirmed participation.";
+            $message = "Announcement sent to {$emailCount} registered users.";
             $messageType = 'success';
-        } catch (Exception $e) {
-            $message = 'Failed to send reminders: ' . $e->getMessage();
+        }
+    }
+    
+    // Handle resending confirmation email
+    if (isset($_POST['resend_confirmation'])) {
+        $userId = (int)$_POST['user_id'];
+        
+        // Get user details
+        $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
+        $stmt->execute([$userId]);
+        $user = $stmt->fetch();
+        
+        if (!$user) {
+            $message = 'User not found.';
             $messageType = 'error';
+        } else {
+            // Generate new confirmation token
+            $confirmationToken = bin2hex(random_bytes(16));
+            
+            // Update user's confirmation token
+            $stmt = $db->prepare("UPDATE users SET email_confirmation_token = ? WHERE id = ?");
+            $stmt->execute([$confirmationToken, $userId]);
+            
+            // Send confirmation email
+            $emailBody = getRegistrationEmail($user['name'], $confirmationToken);
+            if (sendEmail($user['email'], 'Confirm Your Email Address', $emailBody)) {
+                logEmail($userId, null, 'email_confirmation');
+                $message = 'Confirmation email has been resent to ' . htmlspecialchars($user['email']) . '.';
+                $messageType = 'success';
+            } else {
+                $message = 'Failed to resend confirmation email.';
+                $messageType = 'error';
+            }
         }
     }
 }
@@ -225,105 +285,15 @@ $users = $stmt->fetchAll();
 // Get unseen announcement count for admin
 $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id']);
 
-function pairParticipants($cycleId, $db) {
-    // Get confirmed participants
-    $stmt = $db->prepare("
-        SELECT cp.user_id, u.country 
-        FROM cycle_participations cp
-        JOIN users u ON cp.user_id = u.id
-        WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1
-    ");
-    $stmt->execute([$cycleId]);
-    $participants = $stmt->fetchAll();
-    
-    if (count($participants) < 2) {
-        return false;
-    }
-    
-    // Group by country
-    $byCountry = [];
-    foreach ($participants as $p) {
-        $byCountry[$p['country']][] = $p['user_id'];
-    }
-    
-    // Sort countries by participant count (descending)
-    uasort($byCountry, function($a, $b) {
-        return count($b) - count($a);
-    });
-    
-    // Create ordered list prioritizing same-country pairs
-    $ordered = [];
-    $paired = [];
-    
-    foreach ($byCountry as $country => $userIds) {
-        if (count($userIds) >= 2) {
-            // Pair within country
-            for ($i = 0; $i < count($userIds) - 1; $i += 2) {
-                $ordered[] = $userIds[$i];
-                $ordered[] = $userIds[$i + 1];
-                $paired[] = $userIds[$i];
-                $paired[] = $userIds[$i + 1];
-            }
-            if (count($userIds) % 2 == 1) {
-                // Odd number, save last one for cross-country pairing
-                $remaining[] = end($userIds);
-            }
-        } else {
-            $remaining[] = $userIds[0];
-        }
-    }
-    
-    // Add remaining for cross-country pairing
-    foreach ($remaining ?? [] as $userId) {
-        if (!in_array($userId, $paired)) {
-            $ordered[] = $userId;
-        }
-    }
-    
-    // Round robin pairing
-    $pairings = [];
-    $n = count($ordered);
-    for ($i = 0; $i < $n; $i++) {
-        $current = $ordered[$i];
-        $next = $ordered[($i + 1) % $n];
-        $pairings[$current] = $next;
-    }
-    
-    // Update database
-    foreach ($pairings as $userId => $pairedWithId) {
-        $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$pairedWithId, $cycleId, $userId]);
-        
-        // Send pairing email
-        $stmt = $db->prepare("SELECT u.name, u.email, u.postal_address FROM users u JOIN cycle_participations cp ON cp.paired_with_id = u.id WHERE cp.cycle_id = ? AND cp.user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        $partner = $stmt->fetch();
-        
-        $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
-        $stmt->execute([$userId]);
-        $user = $stmt->fetch();
-        
-        if ($partner && $user) {
-            $token = generateToken();
-            $emailBody = getPairingEmail($user['name'], $partner['name'], $partner['postal_address'], $token);
-            sendEmail($user['email'], 'You have been paired! - Zine Exchange Club', $emailBody);
-            logEmail($userId, $cycleId, 'pairing_notification');
-        }
-    }
-    
-    // Mark cycle as paired
-    $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
-    $stmt->execute([$cycleId]);
-    
-    return true;
-}
+// The pairParticipants function is now defined in includes/pairing_algorithms.php
+// and automatically uses the algorithm specified in PAIRING_ALGORITHM constant
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin - Zine Exchange Club</title>
+    <title>Admin - <?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="../css/style.css">
 </head>
 <body>
@@ -551,6 +521,9 @@ function pairParticipants($cycleId, $db) {
                                     <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                                     <td>
                                         <button class="btn-small" onclick="editUser(<?php echo $user['id']; ?>)">Edit</button>
+                                        <?php if (!$user['email_confirmed']): ?>
+                                            <button class="btn-small" onclick="resendConfirmationEmail(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email']); ?>')">Resend Confirmation</button>
+                                        <?php endif; ?>
                                         <button class="btn-small btn-danger" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name']); ?>')">Delete</button>
                                     </td>
                                 </tr>
@@ -797,6 +770,16 @@ function pairParticipants($cycleId, $db) {
                 const form = document.createElement('form');
                 form.method = 'POST';
                 form.innerHTML = '<input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="delete_user" value="1">';
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        function resendConfirmationEmail(userId, userEmail) {
+            if (confirm(`Are you sure you want to resend confirmation email to "${userEmail}"?`)) {
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.innerHTML = '<input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="resend_confirmation" value="1">';
                 document.body.appendChild(form);
                 form.submit();
             }
