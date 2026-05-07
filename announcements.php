@@ -14,15 +14,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
     if (isset($_POST['add_announcement'])) {
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
+        $sendToAll = isset($_POST['send_to_all']) ? 1 : 0;
         
         if ($title && $content) {
             try {
                 $stmt = $db->prepare("INSERT INTO announcements (title, content, created_by) VALUES (?, ?, ?)");
                 $stmt->execute([$title, $content, $_SESSION['user_id']]);
+                $announcementId = $db->lastInsertId();
                 $message = 'Announcement added successfully!';
                 $messageType = 'success';
+                
+                // If send_to_all is checked, send email to all registered users
+                if ($sendToAll) {
+                    // Get all registered users
+                    $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
+                    $stmt->execute();
+                    $users = $stmt->fetchAll();
+                    
+                    $emailCount = 0;
+                    foreach ($users as $user) {
+                        $emailBody = getAnnouncementEmail($user['name'], $title, $content);
+                        if (sendEmail($user['email'], 'New Announcement: ' . $title, $emailBody)) {
+                            $emailCount++;
+                            logEmail($user['id'], null, 'announcement_notification');
+                        }
+                    }
+                    
+                    // Mark announcement as sent to all users
+                    $stmt = $db->prepare("UPDATE announcements SET email_sent = 1 WHERE id = ?");
+                    $stmt->execute([$announcementId]);
+                    
+                    $message .= " Announcement sent to {$emailCount} registered users.";
+                }
             } catch (Exception $e) {
-                $message = 'Failed to add announcement.';
+                $message = 'Failed to add announcement. Error: ' . $e->getMessage();
                 $messageType = 'error';
             }
         }
