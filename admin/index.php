@@ -606,6 +606,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         <th>Wants to Participate</th>
                                         <th>Confirmed</th>
                                         <th>Paired With</th>
+                                        <th>Acknowledged</th>
                                         <th>Zine Sent</th>
                                         <th>Zine Received</th>
                                     </tr>
@@ -634,6 +635,13 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                     <?php echo htmlspecialchars($p['partner_name']); ?>
                                                 <?php else: ?>
                                                     -
+                                                <?php endif; ?>
+                                            </td>
+                                            <td>
+                                                <?php if ($p['pairing_confirmed']): ?>
+                                                    <span class="status completed">Yes</span>
+                                                <?php else: ?>
+                                                    <span class="status pending">No</span>
                                                 <?php endif; ?>
                                             </td>
                                             <td>
@@ -691,6 +699,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                 <th>Country</th>
                                                 <th>Confirmed</th>
                                                 <th>Paired With</th>
+                                                <th>Acknowledged</th>
                                                 <th>Zine Sent</th>
                                                 <th>Zine Received</th>
                                             </tr>
@@ -712,6 +721,13 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                             <?php echo htmlspecialchars($p['partner_name']); ?>
                                                         <?php else: ?>
                                                             -
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($p['pairing_confirmed']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
