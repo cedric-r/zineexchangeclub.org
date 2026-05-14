@@ -360,7 +360,35 @@ class PairingAlgorithmFactory {
 function pairParticipants($cycleId, $db) {
     try {
         $algorithm = PairingAlgorithmFactory::getAlgorithm(PAIRING_ALGORITHM);
-        return $algorithm->pair($db, $cycleId);
+        $result = $algorithm->pair($db, $cycleId);
+
+        if ($result) {
+            // Send pairing notification emails to each paired user
+            $stmt = $db->prepare("
+                SELECT cp.user_id, u.name, u.email,
+                       p.name as partner_name, p.email as partner_email, p.postal_address as partner_address, p.country as partner_country
+                FROM cycle_participations cp
+                JOIN users u ON cp.user_id = u.id
+                JOIN users p ON cp.paired_with_id = p.id
+                WHERE cp.cycle_id = ? AND cp.paired_with_id IS NOT NULL
+            ");
+            $stmt->execute([$cycleId]);
+            $pairedUsers = $stmt->fetchAll();
+
+            foreach ($pairedUsers as $user) {
+                $token = bin2hex(random_bytes(16));
+                $partnerInfo = "Email: " . $user['partner_email'] . "\n" . $user['partner_address'];
+                $emailBody = getPairingEmail($user['name'], $user['partner_name'], $partnerInfo, $user['partner_country'], $token);
+                sendEmail($user['email'], 'You\'ve Been Paired!', $emailBody);
+                logEmail($user['user_id'], $cycleId, 'pairing_notification');
+
+                // Store token for confirmation
+                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$token, $cycleId, $user['user_id']]);
+            }
+        }
+
+        return $result;
     } catch (Exception $e) {
         error_log("Pairing failed: " . $e->getMessage());
         return false;

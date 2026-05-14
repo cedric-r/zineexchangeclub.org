@@ -23,6 +23,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $messageType = 'success';
     }
     
+    if (isset($_POST['want_to_participate'])) {
+        $cycleId = (int)$_POST['cycle_id'];
+        
+        try {
+            // Check if user already has a participation record for this cycle
+            $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ?");
+            $stmt->execute([$cycleId, $userId]);
+            $existing = $stmt->fetch();
+            
+            if (!$existing) {
+                // Create new participation record
+                $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate) VALUES (?, ?, 1)");
+                $stmt->execute([$cycleId, $userId]);
+                $message = 'You have been added to the cycle! Please confirm your participation below.';
+            } else {
+                // Update existing record
+                $stmt = $db->prepare("UPDATE cycle_participations SET wants_to_participate = 1 WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$cycleId, $userId]);
+                $message = 'Your participation interest has been updated!';
+            }
+            $messageType = 'success';
+        } catch (Exception $e) {
+            $message = 'Failed to update participation. Error: ' . $e->getMessage();
+            $messageType = 'error';
+        }
+    }
+    
     if (isset($_POST['confirm_pairing'])) {
         $cycleId = (int)$_POST['cycle_id'];
         $token = $_POST['token'] ?? '';
@@ -110,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get user's participations
 $stmt = $db->prepare("
-    SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done,
+    SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open,
            u.name as partner_name, u.postal_address as partner_address, u.country as partner_country
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
@@ -120,6 +147,18 @@ $stmt = $db->prepare("
 ");
 $stmt->execute([$userId]);
 $participations = $stmt->fetchAll();
+
+// Get open cycles that user hasn't participated in yet
+$stmt = $db->prepare("
+    SELECT c.*, 
+           CASE WHEN cp.id IS NOT NULL THEN 1 ELSE 0 END as has_participation
+    FROM cycles c
+    LEFT JOIN cycle_participations cp ON c.id = cp.cycle_id AND cp.user_id = ?
+    WHERE c.status = 'active' AND c.registration_open = 1 AND cp.id IS NULL
+    ORDER BY c.start_date DESC
+");
+$stmt->execute([$userId]);
+$availableCycles = $stmt->fetchAll();
 
 // Get user's zine info
 $stmt = $db->prepare("SELECT * FROM zines WHERE user_id = ?");
@@ -174,9 +213,29 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                 </section>
             <?php endif; ?>
             
-            <?php if (empty($participations)): ?>
-                <p class="empty-state">You haven't participated in any exchange cycles yet. When a new cycle starts, you'll receive an invitation to participate.</p>
-            <?php else: ?>
+            <?php if (!empty($availableCycles)): ?>
+                <section class="available-cycles">
+                    <h2>Available Exchange Cycles</h2>
+                    <p class="section-description">These cycles are currently open for registration. Click "I Want to Participate" to join:</p>
+                    
+                    <?php foreach ($availableCycles as $cycle): ?>
+                        <div class="cycle-card">
+                            <h3><?php echo htmlspecialchars($cycle['name']); ?></h3>
+                            <p class="date">Starts: <?php echo date('F j, Y', strtotime($cycle['start_date'])); ?></p>
+                            <p class="status">Status: <span class="open">Registration Open</span></p>
+                            
+                            <form method="post" class="participation-form">
+                                <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
+                                <button type="submit" name="want_to_participate" class="btn">I Want to Participate</button>
+                            </form>
+                        </div>
+                    <?php endforeach; ?>
+                </section>
+            <?php endif; ?>
+            
+            <?php if (empty($participations) && empty($availableCycles)): ?>
+                <p class="empty-state">No exchange cycles are currently available. Check back later for new cycles!</p>
+            <?php elseif (!empty($participations)): ?>
                 <section class="participations">
                     <h2>My Participations</h2>
                     

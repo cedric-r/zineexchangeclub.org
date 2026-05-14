@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS cycle_participations (
     zine_sent_date DATE DEFAULT NULL,
     zine_received TINYINT(1) DEFAULT 0,
     zine_received_date DATE DEFAULT NULL,
+    confirmation_token VARCHAR(64) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,

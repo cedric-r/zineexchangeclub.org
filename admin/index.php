@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             foreach ($users as $user) {
                 $token = generateToken();
-                $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate) VALUES (?, ?, 1)");
-                $stmt->execute([$cycleId, $user['id']]);
+                $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, confirmation_token) VALUES (?, ?, 1, ?)");
+                $stmt->execute([$cycleId, $user['id'], $token]);
                 
                 // Store token for confirmation (we'll use a separate table or add to participations)
                 // For now, we'll create a simple token-based confirmation
@@ -174,22 +174,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($_POST['send_reminder'])) {
         $cycleId = (int)$_POST['cycle_id'];
-        
+
         // Get users who haven't confirmed participation but want to participate
         $stmt = $db->prepare("
-            SELECT u.name, u.email 
+            SELECT u.id, u.name, u.email
             FROM users u
             JOIN cycle_participations cp ON u.id = cp.user_id
             WHERE cp.cycle_id = ? AND cp.participation_confirmed = 0 AND cp.wants_to_participate = 1
         ");
         $stmt->execute([$cycleId]);
         $unconfirmedUsers = $stmt->fetchAll();
-        
+
         // Get cycle info
         $stmt = $db->prepare("SELECT name FROM cycles WHERE id = ?");
         $stmt->execute([$cycleId]);
         $cycle = $stmt->fetch();
-        
+
         $reminderCount = 0;
         foreach ($unconfirmedUsers as $user) {
             $emailBody = getParticipationReminderEmail($user['name'], $cycle['name']);
@@ -198,8 +198,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logEmail($user['id'], $cycleId, 'participation_reminder');
             }
         }
-        
+
         $message = "Reminders sent to {$reminderCount} user(s) who haven't confirmed participation.";
+        $messageType = 'success';
+    }
+
+    if (isset($_POST['resend_pairing_emails'])) {
+        $cycleId = (int)$_POST['cycle_id'];
+
+        $stmt = $db->prepare("
+            SELECT cp.user_id, u.name, u.email,
+                   p.name as partner_name, p.email as partner_email, p.postal_address as partner_address, p.country as partner_country
+            FROM cycle_participations cp
+            JOIN users u ON cp.user_id = u.id
+            JOIN users p ON cp.paired_with_id = p.id
+            WHERE cp.cycle_id = ? AND cp.paired_with_id IS NOT NULL
+        ");
+        $stmt->execute([$cycleId]);
+        $pairedUsers = $stmt->fetchAll();
+
+        $emailCount = 0;
+        foreach ($pairedUsers as $user) {
+            $token = bin2hex(random_bytes(16));
+            $partnerInfo = "Email: " . $user['partner_email'] . "\n" . $user['partner_address'];
+            $emailBody = getPairingEmail($user['name'], $user['partner_name'], $partnerInfo, $user['partner_country'], $token);
+            if (sendEmail($user['email'], 'Your Exchange Pairing', $emailBody)) {
+                $emailCount++;
+                logEmail($user['user_id'], $cycleId, 'pairing_notification');
+
+                // Store token for confirmation
+                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$token, $cycleId, $user['user_id']]);
+            }
+        }
+
+        $message = "Pairing emails resent to {$emailCount} user(s).";
         $messageType = 'success';
     }
     
@@ -407,10 +440,19 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             </form>
                                         <?php endif; ?>
                                         
+                                        <?php if (!$cycle['pairing_done']): ?>
                                         <form method="post" class="inline-form">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="send_reminder" class="btn-small">Send Reminder</button>
                                         </form>
+                                        <?php endif; ?>
+
+                                        <?php if ($cycle['pairing_done']): ?>
+                                        <form method="post" class="inline-form">
+                                            <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
+                                            <button type="submit" name="resend_pairing_emails" class="btn-small">Resend Paring Emails</button>
+                                        </form>
+                                        <?php endif; ?>
                                         
                                         <form method="post" class="inline-form">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">

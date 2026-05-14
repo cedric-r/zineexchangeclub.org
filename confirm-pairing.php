@@ -7,33 +7,29 @@ $message = '';
 $success = false;
 
 if ($token) {
-    if (isLoggedIn()) {
-        $db = getDB();
-        $userId = $_SESSION['user_id'];
-        
-        // Find the current cycle where user is paired but hasn't confirmed
-        $stmt = $db->prepare("
-            SELECT cp.id, cp.cycle_id, c.name 
-            FROM cycle_participations cp
-            JOIN cycles c ON cp.cycle_id = c.id
-            WHERE cp.user_id = ? AND cp.paired_with_id IS NOT NULL AND cp.pairing_confirmed = 0
-            ORDER BY c.start_date DESC
-            LIMIT 1
-        ");
-        $stmt->execute([$userId]);
-        $participation = $stmt->fetch();
-        
-        if ($participation) {
-            $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1 WHERE id = ?");
-            $stmt->execute([$participation['id']]);
-            $success = true;
-            $message = 'Your pairing for ' . htmlspecialchars($participation['name']) . ' has been confirmed!';
-        } else {
-            $message = 'No pending pairing confirmation found, or you have already confirmed.';
-        }
-    } else {
+    $db = getDB();
+
+    $stmt = $db->prepare("
+        SELECT cp.id, cp.user_id, cp.cycle_id, c.name
+        FROM cycle_participations cp
+        JOIN cycles c ON cp.cycle_id = c.id
+        WHERE cp.confirmation_token = ? AND cp.pairing_confirmed = 0 AND cp.paired_with_id IS NOT NULL
+    ");
+    $stmt->execute([$token]);
+    $participation = $stmt->fetch();
+
+    if (!$participation) {
+        $message = 'Invalid or expired confirmation token. The token may have already been used.';
+    } elseif (!isLoggedIn()) {
         header('Location: login.php');
         exit;
+    } elseif ($participation['user_id'] != $_SESSION['user_id']) {
+        $message = 'This confirmation link is for a different account. Please log in with the correct account.';
+    } else {
+        $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1, confirmation_token = NULL WHERE id = ?");
+        $stmt->execute([$participation['id']]);
+        $success = true;
+        $message = 'Your pairing for ' . htmlspecialchars($participation['name']) . ' has been confirmed!';
     }
 } else {
     $message = 'No confirmation token provided.';
@@ -50,7 +46,7 @@ if ($token) {
 <body>
     <div class="container">
         <?php require_once 'includes/header.php'; ?>
-        
+
         <nav>
             <a href="index.php">Home</a>
             <a href="gallery.php">Gallery</a>
@@ -66,7 +62,7 @@ if ($token) {
                 <a href="admin/index.php">Admin</a>
             <?php endif; ?>
         </nav>
-        
+
         <main>
             <div class="message-box <?php echo $success ? 'success' : 'error'; ?>">
                 <h1><?php echo $success ? 'Pairing Confirmed!' : 'Confirmation Failed'; ?></h1>
@@ -78,7 +74,7 @@ if ($token) {
                 <?php endif; ?>
             </div>
         </main>
-        
+
         <?php require_once 'includes/footer.php'; ?>
     </div>
 </body>
