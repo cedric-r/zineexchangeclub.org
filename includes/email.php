@@ -9,7 +9,7 @@ function sendEmail($to, $subject, $body, $html = true) {
     $headers .= "Subject: " . $subject . "\r\n";
     $headers .= "MIME-Version: 1.0\r\n";
     $headers .= "Date: " . date('r') . "\r\n";
-    $headers .= "Message-ID: <" . md5(uniqid()) . "@" . parse_url(SITE_URL, PHP_URL_HOST) . ">\r\n";
+    $headers .= "Message-ID: <" . bin2hex(random_bytes(16)) . "@" . parse_url(SITE_URL, PHP_URL_HOST) . ">\r\n";
 
     if ($html) {
         $headers .= "Content-Type: text/html; charset=UTF-8\r\n";

@@ -10,7 +10,7 @@ $db = getDB();
 
 // Find users who were paired more than 14 days ago but haven't reported sending
 $stmt = $db->prepare("
-    SELECT cp.user_id, u.name, u.email, c.name as cycle_name, c.start_date
+    SELECT cp.user_id, cp.cycle_id, u.name, u.email, c.name as cycle_name, c.start_date
     FROM cycle_participations cp
     JOIN users u ON cp.user_id = u.id
     JOIN cycles c ON cp.cycle_id = c.id
@@ -30,13 +30,13 @@ foreach ($users as $user) {
         WHERE user_id = ? AND cycle_id = ? AND email_type = 'reminder_post'
         AND sent_at >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
     ");
-    $stmt->execute([$user['user_id'], $user['cycle_name']]);
+    $stmt->execute([$user['user_id'], $user['cycle_id']]);
     $recentReminder = $stmt->fetchColumn();
-    
+
     if (!$recentReminder) {
         $emailBody = getReminderEmail($user['name'], 'post_zine');
         sendEmail($user['email'], 'Reminder: Send your zine - Zine Exchange Club', $emailBody);
-        logEmail($user['user_id'], $user['cycle_name'], 'reminder_post');
+        logEmail($user['user_id'], $user['cycle_id'], 'reminder_post');
         echo "Reminder sent to: {$user['email']}\n";
     }
 }

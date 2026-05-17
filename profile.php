@@ -21,6 +21,9 @@ $stmt->execute([$userId]);
 $zine = $stmt->fetch();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
     if (isset($_POST['update_personal_info'])) {
         $name = trim($_POST['name'] ?? '');
         $postalAddress = trim($_POST['postal_address'] ?? '');
@@ -150,6 +153,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
             <section class="admin-section">
                 <h2>Personal Information</h2>
                 <form method="post" class="form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="update_personal_info" value="1">
                     
                     <div class="form-group">
@@ -185,6 +189,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
             <section class="admin-section">
                 <h2>My Zine</h2>
                 <form method="post" class="form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="update_zine_info" value="1">
                     
                     <div class="form-group">
@@ -210,6 +215,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
             <section class="admin-section">
                 <h2>Change Password</h2>
                 <form method="post" class="form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="update_password" value="1">
                     
                     <div class="form-group">

@@ -13,14 +13,26 @@ $messageType = '';
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
     if (isset($_POST['confirm_participation'])) {
         $cycleId = (int)$_POST['cycle_id'];
         $token = $_POST['token'] ?? '';
-        
-        $stmt = $db->prepare("UPDATE cycle_participations SET participation_confirmed = 1 WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        $message = 'Participation confirmed!';
-        $messageType = 'success';
+
+        // Validate token matches the stored confirmation token
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND participation_confirmed = 0");
+        $stmt->execute([$cycleId, $userId, $token]);
+
+        if ($stmt->fetch()) {
+            $stmt = $db->prepare("UPDATE cycle_participations SET participation_confirmed = 1, confirmation_token = NULL WHERE cycle_id = ? AND user_id = ?");
+            $stmt->execute([$cycleId, $userId]);
+            $message = 'Participation confirmed!';
+            $messageType = 'success';
+        } else {
+            $message = 'Invalid or expired confirmation token.';
+            $messageType = 'error';
+        }
     }
     
     if (isset($_POST['want_to_participate'])) {
@@ -53,11 +65,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['confirm_pairing'])) {
         $cycleId = (int)$_POST['cycle_id'];
         $token = $_POST['token'] ?? '';
-        
-        $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1 WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        $message = 'Pairing confirmed!';
-        $messageType = 'success';
+
+        // Validate token matches the stored confirmation token
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL");
+        $stmt->execute([$cycleId, $userId, $token]);
+
+        if ($stmt->fetch()) {
+            $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1, confirmation_token = NULL WHERE cycle_id = ? AND user_id = ?");
+            $stmt->execute([$cycleId, $userId]);
+            $message = 'Pairing confirmed!';
+            $messageType = 'success';
+        } else {
+            $message = 'Invalid or expired pairing confirmation token.';
+            $messageType = 'error';
+        }
     }
     
     if (isset($_POST['report_sent'])) {
@@ -225,6 +246,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                             <p class="status">Status: <span class="open">Registration Open</span></p>
                             
                             <form method="post" class="participation-form">
+                                <?php $csrf = generateCsrfToken(); ?>
+                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                 <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                 <button type="submit" name="want_to_participate" class="btn">I Want to Participate</button>
                             </form>
@@ -250,7 +273,10 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                     <span class="step-label">Participation Confirmed</span>
                                     <?php if (!$p['participation_confirmed'] && $p['wants_to_participate']): ?>
                                         <form method="post" class="inline-form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                            <input type="hidden" name="token" value="<?php echo htmlspecialchars($p['confirmation_token']); ?>">
                                             <button type="submit" name="confirm_participation" class="btn-small">Confirm</button>
                                         </form>
                                     <?php endif; ?>
@@ -261,7 +287,10 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                     <span class="step-label">Pairing Confirmed</span>
                                     <?php if ($p['pairing_done'] && !$p['pairing_confirmed']): ?>
                                         <form method="post" class="inline-form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                            <input type="hidden" name="token" value="<?php echo htmlspecialchars($p['confirmation_token']); ?>">
                                             <button type="submit" name="confirm_pairing" class="btn-small">Confirm</button>
                                         </form>
                                     <?php endif; ?>
@@ -272,6 +301,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                     <span class="step-label">Zine Sent</span>
                                     <?php if ($p['pairing_done'] && !$p['zine_sent']): ?>
                                         <form method="post" class="inline-form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
                                             <button type="submit" name="report_sent" class="btn-small">Report Sent</button>
                                         </form>
@@ -283,6 +314,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                     <span class="step-label">Zine Received</span>
                                     <?php if ($p['zine_sent'] && !$p['zine_received']): ?>
                                         <form method="post" class="inline-form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
                                             <button type="submit" name="report_received" class="btn-small">Report Received</button>
                                         </form>
@@ -304,6 +337,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                 <div class="upload-section">
                                     <h4>Upload Photo of Received Zine</h4>
                                     <form method="post" enctype="multipart/form-data" class="form">
+                                        <?php $csrf = generateCsrfToken(); ?>
+                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                         <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
                                         <div class="form-group">
                                             <label for="photo_<?php echo $p['cycle_id']; ?>">Photo</label>

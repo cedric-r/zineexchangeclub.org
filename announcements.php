@@ -11,6 +11,9 @@ $messageType = '';
 
 // Handle form submissions for admin actions
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
     if (isset($_POST['add_announcement'])) {
         $title = trim($_POST['title']);
         $content = trim($_POST['content']);
@@ -68,10 +71,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
                 // If send_to_all is checked, send email to all registered users
                 if ($sendToAll) {
                     // Get all registered users
-                    $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
+                    $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
                     $stmt->execute();
                     $users = $stmt->fetchAll();
-                    
+
                     $emailCount = 0;
                     foreach ($users as $user) {
                         $emailBody = getAnnouncementEmail($user['name'], $title, $content);
@@ -80,7 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
                             logEmail($user['id'], null, 'announcement_notification');
                         }
                     }
-                    
+
                     $message .= " Announcement sent to {$emailCount} registered users.";
                 }
             } catch (Exception $e) {
@@ -95,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
     
     if (isset($_POST['delete_announcement'])) {
         $announcementId = (int)$_POST['announcement_id'];
-        
+
         try {
             $stmt = $db->prepare("DELETE FROM announcements WHERE id = ?");
             $stmt->execute([$announcementId]);
@@ -104,6 +107,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isAdmin()) {
         } catch (Exception $e) {
             $message = 'Failed to delete announcement.';
             $messageType = 'error';
+        }
+    }
+
+    if (isset($_POST['send_announcement_to_all'])) {
+        $announcementId = (int)$_POST['announcement_id'];
+
+        // Get announcement details
+        $stmt = $db->prepare("SELECT a.title, a.content FROM announcements a WHERE a.id = ?");
+        $stmt->execute([$announcementId]);
+        $announcement = $stmt->fetch();
+
+        if (!$announcement) {
+            $message = 'Announcement not found.';
+            $messageType = 'error';
+        } else {
+            // Get all registered users
+            $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
+            $stmt->execute();
+            $users = $stmt->fetchAll();
+
+            $emailCount = 0;
+            foreach ($users as $user) {
+                $emailBody = getAnnouncementEmail($user['name'], $announcement['title'], $announcement['content']);
+                if (sendEmail($user['email'], 'New Announcement: ' . $announcement['title'], $emailBody)) {
+                    $emailCount++;
+                    logEmail($user['id'], null, 'announcement_notification');
+                }
+            }
+
+            $message = "Announcement sent to {$emailCount} registered users.";
+            $messageType = 'success';
+
+            // Mark announcement as sent to all users
+            $stmt = $db->prepare("UPDATE announcements SET email_sent = 1 WHERE id = ?");
+            $stmt->execute([$announcementId]);
         }
     }
 }
@@ -122,7 +160,6 @@ $announcements = $stmt->fetchAll();
 // Mark all announcements as viewed for this user
 $announcementIds = array_column($announcements, 'id');
 if (!empty($announcementIds)) {
-    $placeholders = str_repeat('?,', count($announcementIds) - 1) . '?';
     $stmt = $db->prepare("
         INSERT IGNORE INTO announcement_views (announcement_id, user_id) 
         VALUES " . str_repeat('(?, ?),', count($announcementIds) - 1) . "(?, ?)
@@ -134,42 +171,6 @@ if (!empty($announcementIds)) {
     }
     $stmt->execute($params);
 }
-    
-    // Handle sending announcement to all users
-    if (isset($_POST['send_announcement_to_all'])) {
-        $announcementId = (int)$_POST['announcement_id'];
-        
-        // Get announcement details
-        $stmt = $db->prepare("SELECT a.title, a.content FROM announcements a WHERE a.id = ?");
-        $stmt->execute([$announcementId]);
-        $announcement = $stmt->fetch();
-        
-        if (!$announcement) {
-            $message = 'Announcement not found.';
-            $messageType = 'error';
-        } else {
-            // Get all registered users
-            $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
-            $stmt->execute();
-            $users = $stmt->fetchAll();
-            
-            $emailCount = 0;
-            foreach ($users as $user) {
-                $emailBody = getAnnouncementEmail($user['name'], $announcement['title'], $announcement['content']);
-                if (sendEmail($user['email'], 'New Announcement: ' . $announcement['title'], $emailBody)) {
-                    $emailCount++;
-                    logEmail($user['id'], null, 'announcement_notification');
-                }
-            }
-            
-            $message = "Announcement sent to {$emailCount} registered users.";
-            $messageType = 'success';
-            
-            // Mark announcement as sent to all users
-            $stmt = $db->prepare("UPDATE announcements SET email_sent = 1 WHERE id = ?");
-            $stmt->execute([$announcementId]);
-        }
-    }
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -210,6 +211,7 @@ if (!empty($announcementIds)) {
                     <div class="announcement-form">
                         <h3>Add New Announcement</h3>
                         <form method="post" class="form">
+                            <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                             <div class="form-group">
                                 <label for="title">Title *</label>
                                 <input type="text" id="title" name="title" required placeholder="Enter announcement title">
@@ -280,6 +282,7 @@ if (!empty($announcementIds)) {
                     <button class="modal-close" onclick="closeEditModal()">&times;</button>
                 </div>
                 <form method="post" class="form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="announcement_id" id="edit_announcement_id">
                     <div class="form-group">
                         <label for="edit_title">Title *</label>
@@ -299,6 +302,7 @@ if (!empty($announcementIds)) {
         </div>
         
         <script>
+            const csrfToken = '<?php echo generateCsrfToken(); ?>';
             function editAnnouncement(button) {
                 const id = button.getAttribute('data-id');
                 const title = button.getAttribute('data-title');
@@ -317,7 +321,7 @@ if (!empty($announcementIds)) {
                 if (confirm('Are you sure you want to delete announcement "' + title + '"? This action cannot be undone.')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.innerHTML = '<input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="delete_announcement" value="1">';
+                    form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="delete_announcement" value="1">';
                     document.body.appendChild(form);
                     form.submit();
                 }
@@ -327,7 +331,7 @@ if (!empty($announcementIds)) {
                 if (confirm('Are you sure you want to send this announcement to all registered users: "' + title + '"?')) {
                     const form = document.createElement('form');
                     form.method = 'POST';
-                    form.innerHTML = '<input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="send_announcement_to_all" value="1">';
+                    form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="send_announcement_to_all" value="1">';
                     document.body.appendChild(form);
                     form.submit();
                 }

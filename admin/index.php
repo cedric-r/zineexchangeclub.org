@@ -13,6 +13,11 @@ $messageType = '';
 
 // Handle cycle creation
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Validate CSRF token for all POST requests
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
+
     if (isset($_POST['create_cycle'])) {
         $name = trim($_POST['cycle_name']);
         $startDate = $_POST['start_date'];
@@ -249,10 +254,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         } else {
             // Get all registered users
-            $stmt = $db->prepare("SELECT name, email FROM users WHERE email_confirmed = 1");
+            $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
             $stmt->execute();
             $users = $stmt->fetchAll();
-            
+
             $emailCount = 0;
             foreach ($users as $user) {
                 $emailBody = getAnnouncementEmail($user['name'], $announcement['title'], $announcement['content']);
@@ -261,7 +266,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     logEmail($user['id'], null, 'announcement_notification');
                 }
             }
-            
+
             $message = "Announcement sent to {$emailCount} registered users.";
             $messageType = 'success';
         }
@@ -357,6 +362,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
             <section class="admin-section">
                 <h2>Create New Cycle</h2>
                 <form method="post" class="form">
+                    <?php $csrf = generateCsrfToken(); ?>
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                     <div class="form-group">
                         <label for="cycle_name">Cycle Name</label>
                         <input type="text" id="cycle_name" name="cycle_name" required placeholder="e.g., Spring 2024 Exchange">
@@ -428,6 +435,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                     <td>
                                         <?php if (!$cycle['pairing_done'] && $confirmedParticipants >= 2): ?>
                                             <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                                 <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                                 <button type="submit" name="pair_users" class="btn-small">Pair Users</button>
                                             </form>
@@ -435,6 +444,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         
                                         <?php if ($cycle['registration_open']): ?>
                                             <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                                 <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                                 <button type="submit" name="close_registration" class="btn-small">Close Registration</button>
                                             </form>
@@ -442,6 +453,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         
                                         <?php if (!$cycle['pairing_done']): ?>
                                         <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="send_reminder" class="btn-small">Send Reminder</button>
                                         </form>
@@ -449,12 +462,16 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
 
                                         <?php if ($cycle['pairing_done']): ?>
                                         <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="resend_pairing_emails" class="btn-small">Resend Paring Emails</button>
                                         </form>
                                         <?php endif; ?>
                                         
                                         <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="close_cycle" class="btn-small btn-danger">Close Cycle</button>
                                         </form>
@@ -462,6 +479,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name']); ?>')">Delete</button>
                                         
                                         <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="reset_cycle" class="btn-small btn-danger">Reset</button>
                                         </form>
@@ -511,6 +530,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                     </td>
                                     <td>
                                         <form method="post" class="inline-form">
+                                                <?php $csrf = generateCsrfToken(); ?>
+                                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="reopen_cycle" class="btn-small">Reopen</button>
                                         </form>
@@ -542,7 +563,14 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                         </thead>
                         <tbody>
                             <?php foreach ($users as $user): ?>
-                                <tr>
+                                <tr id="user-row-<?php echo $user['id']; ?>"
+                                    data-name="<?php echo htmlspecialchars($user['name']); ?>"
+                                    data-email="<?php echo htmlspecialchars($user['email']); ?>"
+                                    data-country="<?php echo htmlspecialchars($user['country']); ?>"
+                                    data-postal-address="<?php echo htmlspecialchars($user['postal_address']); ?>"
+                                    data-accepts-adult-zines="<?php echo $user['accepts_adult_zines']; ?>"
+                                    data-is-admin="<?php echo $user['is_admin']; ?>"
+                                    data-email-confirmed="<?php echo $user['email_confirmed']; ?>">
                                     <td><?php echo htmlspecialchars($user['name']); ?></td>
                                     <td><?php echo htmlspecialchars($user['email']); ?></td>
                                     <td><?php echo htmlspecialchars($user['country']); ?></td>
@@ -764,6 +792,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                     <button class="modal-close" onclick="closeUserModal()">&times;</button>
                 </div>
                 <form method="post" class="form">
+                    <?php $csrf = generateCsrfToken(); ?>
+                    <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                     <input type="hidden" name="user_id" id="edit_user_id">
                     <div class="form-group">
                         <label for="edit_name">Name *</label>
@@ -802,19 +832,18 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
     </div>
     
     <script>
-        const users = <?php echo json_encode($users); ?>;
-        
+        const csrfToken = '<?php echo generateCsrfToken(); ?>';
         function editUser(userId) {
-            const user = users.find(u => u.id === userId);
-            if (user) {
-                document.getElementById('edit_user_id').value = user.id;
-                document.getElementById('edit_name').value = user.name;
-                document.getElementById('edit_email').value = user.email;
-                document.getElementById('edit_country').value = user.country;
-                document.getElementById('edit_postal_address').value = user.postal_address || '';
-                document.getElementById('edit_accepts_adult_zines').checked = user.accepts_adult_zines == 1;
-                document.getElementById('edit_is_admin').checked = user.is_admin == 1;
-                document.getElementById('edit_email_confirmed').checked = user.email_confirmed == 1;
+            const row = document.getElementById('user-row-' + userId);
+            if (row) {
+                document.getElementById('edit_user_id').value = userId;
+                document.getElementById('edit_name').value = row.dataset.name;
+                document.getElementById('edit_email').value = row.dataset.email;
+                document.getElementById('edit_country').value = row.dataset.country;
+                document.getElementById('edit_postal_address').value = row.dataset.postalAddress;
+                document.getElementById('edit_accepts_adult_zines').checked = row.dataset.acceptsAdultZines === '1';
+                document.getElementById('edit_is_admin').checked = row.dataset.isAdmin === '1';
+                document.getElementById('edit_email_confirmed').checked = row.dataset.emailConfirmed === '1';
                 document.getElementById('userEditModal').style.display = 'block';
             }
         }
@@ -827,27 +856,27 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
             if (confirm(`Are you sure you want to delete user "${userName}"? This will permanently delete all their data including uploaded images and cannot be undone.`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="delete_user" value="1">';
+                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="delete_user" value="1">';
                 document.body.appendChild(form);
                 form.submit();
             }
         }
-        
+
         function resendConfirmationEmail(userId, userEmail) {
             if (confirm(`Are you sure you want to resend confirmation email to "${userEmail}"?`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="resend_confirmation" value="1">';
+                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="resend_confirmation" value="1">';
                 document.body.appendChild(form);
                 form.submit();
             }
         }
-        
+
         function deleteCycle(cycleId, cycleName) {
             if (confirm(`Are you sure you want to delete cycle "${cycleName}"? This will permanently delete all associated data including participations and uploaded images and cannot be undone.`)) {
                 const form = document.createElement('form');
                 form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="cycle_id" value="' + cycleId + '"><input type="hidden" name="delete_cycle" value="1">';
+                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="cycle_id" value="' + cycleId + '"><input type="hidden" name="delete_cycle" value="1">';
                 document.body.appendChild(form);
                 form.submit();
             }

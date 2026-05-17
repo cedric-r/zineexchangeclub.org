@@ -7,6 +7,9 @@ $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        die('Invalid CSRF token.');
+    }
     $name = trim($_POST['name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
@@ -118,8 +121,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <div class="success"><?php echo $success; ?></div>
             <?php else: ?>
                 <form method="post" class="form">
+                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <h2>Personal Information</h2>
-                    
+
                     <div class="form-group">
                         <label for="name">Name *</label>
                         <input type="text" id="name" name="name" required value="<?php echo htmlspecialchars($_POST['name'] ?? ''); ?>">
@@ -181,5 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         <footer>
             <p>&copy; <?php echo date('Y'); ?> Zine Exchange Club</p>
-        <rquire_nc des.php'; ?
+        <?php require_once 'includes/footer.php'; ?>
+    </div>
+</body>
 </html>

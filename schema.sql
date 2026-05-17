@@ -97,8 +97,6 @@ CREATE TABLE announcements (
 CREATE INDEX idx_announcements_created ON announcements(created_at DESC);
 CREATE INDEX idx_announcements_email_sent ON announcements(email_sent);
 
-CREATE INDEX idx_announcements_created ON announcements(created_at DESC);
-
 -- Announcement views table to track which users have seen which announcements
 CREATE TABLE announcement_views (
     id INT AUTO_INCREMENT PRIMARY KEY,
