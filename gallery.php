@@ -68,7 +68,8 @@ if (isLoggedIn()) {
                 <div class="gallery-grid">
                     <?php foreach ($galleryItems as $item): ?>
                         <div class="gallery-item">
-                            <img src="<?php echo htmlspecialchars($item['image_path']); ?>" alt="Zine photo">
+                            <img src="<?php echo htmlspecialchars($item['image_path']); ?>" alt="Zine photo"
+                                 onclick="openLightbox(this, '<?php echo htmlspecialchars($item['caption'] ?? ''); ?>', '<?php echo htmlspecialchars($item['user_name']); ?>', '<?php echo htmlspecialchars($item['cycle_name']); ?>')">
                             <div class="gallery-info">
                                 <p class="by">by <?php echo htmlspecialchars($item['user_name']); ?></p>
                                 <p class="cycle"><?php echo htmlspecialchars($item['cycle_name']); ?></p>
@@ -84,5 +85,26 @@ if (isLoggedIn()) {
         
         <?php require_once 'includes/footer.php'; ?>
     </div>
+
+    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+        <span class="lightbox-close">&times;</span>
+        <img id="lightbox-img" src="" alt="">
+        <div id="lightbox-caption" class="lightbox-caption"></div>
+    </div>
+
+    <script>
+        function openLightbox(img, caption, userName, cycleName) {
+            document.getElementById('lightbox-img').src = img.src;
+            var parts = [];
+            if (caption) parts.push(caption);
+            parts.push('by ' + userName + ' &middot; ' + cycleName);
+            document.getElementById('lightbox-caption').innerHTML = parts.join('<br>');
+            document.getElementById('lightbox').classList.add('open');
+        }
+
+        function closeLightbox() {
+            document.getElementById('lightbox').classList.remove('open');
+        }
+    </script>
 </body>
 </html>

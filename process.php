@@ -159,7 +159,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Get user's participations
 $stmt = $db->prepare("
     SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open,
-           u.name as partner_name, u.postal_address as partner_address, u.country as partner_country
+           u.name as partner_name, u.email as partner_email, u.postal_address as partner_address, u.country as partner_country
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
     LEFT JOIN users u ON cp.paired_with_id = u.id
@@ -327,6 +327,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                 <div class="partner-info">
                                     <h4>Your Exchange Partner</h4>
                                     <p><strong>Name:</strong> <?php echo htmlspecialchars($p['partner_name']); ?></p>
+                                    <p><strong>Email:</strong> <?php echo htmlspecialchars($p['partner_email']); ?></p>
                                     <p><strong>Country:</strong> <?php echo htmlspecialchars($p['partner_country']); ?></p>
                                     <p><strong>Address:</strong></p>
                                     <p class="address"><?php echo nl2br(htmlspecialchars($p['partner_address'])); ?></p>
