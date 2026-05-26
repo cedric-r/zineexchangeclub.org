@@ -6,11 +6,22 @@ require_once 'includes/email.php';
 $error = '';
 $success = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Rate limiting: max 3 password reset requests per 15 minutes
+$rateLimited = isset($_SESSION['reset_blocked_until']) && time() < $_SESSION['reset_blocked_until'];
+
+if ($rateLimited) {
+    $error = 'Too many password reset requests. Please try again later.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
     }
-    $email = trim($_POST['email'] ?? '');
+
+    $_SESSION['reset_attempts'] = ($_SESSION['reset_attempts'] ?? 0) + 1;
+    if ($_SESSION['reset_attempts'] >= 3) {
+        $_SESSION['reset_blocked_until'] = time() + 900;
+        $error = 'Too many password reset requests. Please try again later.';
+    } else {
+        $email = trim($_POST['email'] ?? '');
     
     if (empty($email)) {
         $error = 'Please enter your email address.';
@@ -48,6 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $success = 'If an account with this email exists, a password reset link has been sent.';
         }
     }
+}
 }
 ?>
 <!DOCTYPE html>

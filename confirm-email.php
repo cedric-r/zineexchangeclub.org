@@ -8,7 +8,7 @@ $success = false;
 
 if ($token) {
     $db = getDB();
-    $stmt = $db->prepare("SELECT id, name FROM users WHERE email_confirmation_token = ? AND email_confirmed = 0");
+    $stmt = $db->prepare("SELECT id, name FROM users WHERE email_confirmation_token = ? AND email_confirmed = 0 AND (email_token_expires IS NULL OR email_token_expires > NOW())");
     $stmt->execute([$token]);
     $user = $stmt->fetch();
     

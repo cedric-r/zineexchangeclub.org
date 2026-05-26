@@ -4,6 +4,10 @@
 require_once __DIR__ . '/../config.php';
 
 function sendEmail($to, $subject, $body, $html = true) {
+    // Sanitize headers against CRLF injection
+    $to = str_replace(["\r", "\n"], '', $to);
+    $subject = str_replace(["\r", "\n"], '', $subject);
+
     $headers = "From: " . SMTP_FROM_NAME . " <" . SMTP_FROM . ">\r\n";
     $headers .= "To: " . $to . "\r\n";
     $headers .= "Subject: " . $subject . "\r\n";

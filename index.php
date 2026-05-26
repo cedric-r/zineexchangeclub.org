@@ -11,14 +11,14 @@ $nextCycle = $stmt->fetch();
 
 // Get next cycle with open registration
 $nextOpenCycle = null;
-if ($nextCycle && !$nextCycle['registration_open']) {
+if ($nextCycle && $nextCycle['registration_open']) {
+    $nextOpenCycle = $nextCycle;
+} elseif ($nextCycle && !$nextCycle['registration_open']) {
+    // Next cycle exists but registration is closed, look for future open cycles
     $stmt = $db->prepare("SELECT * FROM cycles WHERE start_date > ? AND registration_open = 1 AND status = 'active' ORDER BY start_date ASC LIMIT 1");
     $stmt->execute([$nextCycle['start_date']]);
     $nextOpenCycle = $stmt->fetch();
-} else if ($nextCycle && $nextCycle['registration_open']) {
-    // If next cycle has open registration, show it as both next and open
-    $nextOpenCycle = null;
-} else if (!$nextCycle) {
+} elseif (!$nextCycle) {
     // If no next cycle found, look for any cycle with open registration
     $stmt = $db->prepare("SELECT * FROM cycles WHERE registration_open = 1 AND status = 'active' ORDER BY start_date ASC LIMIT 1");
     $stmt->execute();

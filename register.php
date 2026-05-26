@@ -45,9 +45,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             try {
                 $db->beginTransaction();
-                
-                $stmt = $db->prepare("INSERT INTO users (name, email, password, postal_address, accepts_adult_zines, country, email_confirmation_token) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                $stmt->execute([$name, $email, $hashedPassword, $postalAddress, $acceptsAdultZines, $country, $confirmationToken]);
+
+                $tokenExpires = date('Y-m-d H:i:s', strtotime('+48 hours'));
+                $stmt = $db->prepare("INSERT INTO users (name, email, password, postal_address, accepts_adult_zines, country, email_confirmation_token, email_token_expires) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                $stmt->execute([$name, $email, $hashedPassword, $postalAddress, $acceptsAdultZines, $country, $confirmationToken, $tokenExpires]);
                 $userId = $db->lastInsertId();
                 
                 // Create zine entry

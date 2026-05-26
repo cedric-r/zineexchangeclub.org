@@ -21,31 +21,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['create_cycle'])) {
         $name = trim($_POST['cycle_name']);
         $startDate = $_POST['start_date'];
-        
+
         if ($name && $startDate) {
-            $stmt = $db->prepare("INSERT INTO cycles (name, start_date, registration_open) VALUES (?, ?, 1)");
-            $stmt->execute([$name, $startDate]);
-            $cycleId = $db->lastInsertId();
-            
-            // Send invitation emails to all existing users
-            $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
-            $stmt->execute();
-            $users = $stmt->fetchAll();
-            
-            foreach ($users as $user) {
-                $token = generateToken();
-                $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, confirmation_token) VALUES (?, ?, 1, ?)");
-                $stmt->execute([$cycleId, $user['id'], $token]);
-                
-                // Store token for confirmation (we'll use a separate table or add to participations)
-                // For now, we'll create a simple token-based confirmation
-                $emailBody = getCycleInvitationEmail($user['name'], $name, $token);
-                sendEmail($user['email'], 'New Exchange Cycle: ' . $name, $emailBody);
-                logEmail($user['id'], $cycleId, 'cycle_invitation');
+            try {
+                $db->beginTransaction();
+
+                $stmt = $db->prepare("INSERT INTO cycles (name, start_date, registration_open) VALUES (?, ?, 1)");
+                $stmt->execute([$name, $startDate]);
+                $cycleId = $db->lastInsertId();
+
+                // Send invitation emails to all existing users
+                $stmt = $db->prepare("SELECT id, name, email FROM users WHERE email_confirmed = 1");
+                $stmt->execute();
+                $users = $stmt->fetchAll();
+
+                foreach ($users as $user) {
+                    $token = generateToken();
+                    $tokenExpires = date('Y-m-d H:i:s', strtotime('+30 days'));
+                    $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, confirmation_token, confirmation_token_expires) VALUES (?, ?, 1, ?, ?)");
+                    $stmt->execute([$cycleId, $user['id'], $token, $tokenExpires]);
+
+                    $emailBody = getCycleInvitationEmail($user['name'], $name, $token);
+                    sendEmail($user['email'], 'New Exchange Cycle: ' . $name, $emailBody);
+                    logEmail($user['id'], $cycleId, 'cycle_invitation');
+                }
+
+                $db->commit();
+
+                $message = 'Cycle created and invitations sent!';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $db->rollBack();
+                $message = 'Failed to create cycle. Please try again.';
+                $messageType = 'error';
             }
-            
-            $message = 'Cycle created and invitations sent!';
-            $messageType = 'success';
         } else {
             $message = 'Please fill in all fields.';
             $messageType = 'error';
@@ -54,9 +63,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($_POST['pair_users'])) {
         $cycleId = (int)$_POST['cycle_id'];
-        pairParticipants($cycleId, $db);
-        $message = 'Participants paired successfully!';
-        $messageType = 'success';
+        if (pairParticipants($cycleId, $db)) {
+            $message = 'Participants paired successfully!';
+            $messageType = 'success';
+        } else {
+            $message = 'Pairing failed. There may be fewer than 2 confirmed participants.';
+            $messageType = 'error';
+        }
     }
     
     if (isset($_POST['close_registration'])) {
@@ -95,56 +108,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($_POST['update_user'])) {
         $userId = (int)$_POST['user_id'];
-        $name = trim($_POST['name']);
-        $email = trim($_POST['email']);
-        $country = trim($_POST['country']);
-        $postalAddress = trim($_POST['postal_address']);
-        $acceptsAdultZines = isset($_POST['accepts_adult_zines']) ? 1 : 0;
-        $isAdmin = isset($_POST['is_admin']) ? 1 : 0;
-        $emailConfirmed = isset($_POST['email_confirmed']) ? 1 : 0;
-        
-        if ($name && $email && $country && $postalAddress) {
-            try {
-                $stmt = $db->prepare("UPDATE users SET name = ?, email = ?, country = ?, postal_address = ?, accepts_adult_zines = ?, is_admin = ?, email_confirmed = ? WHERE id = ?");
-                $stmt->execute([$name, $email, $country, $postalAddress, $acceptsAdultZines, $isAdmin, $emailConfirmed, $userId]);
-                $message = 'User updated successfully!';
-                $messageType = 'success';
-            } catch (Exception $e) {
-                $message = 'Update failed. Email may already be in use.';
+
+        // Prevent self-demotion
+        if ($userId === (int)$_SESSION['user_id'] && !isset($_POST['is_admin'])) {
+            $message = 'You cannot remove your own admin privileges. Ask another admin to do this.';
+            $messageType = 'error';
+        } else {
+            $name = trim($_POST['name']);
+            $email = trim($_POST['email']);
+            $country = trim($_POST['country']);
+            $postalAddress = trim($_POST['postal_address']);
+            $acceptsAdultZines = isset($_POST['accepts_adult_zines']) ? 1 : 0;
+            $isAdmin = isset($_POST['is_admin']) ? 1 : 0;
+            $emailConfirmed = isset($_POST['email_confirmed']) ? 1 : 0;
+
+            if ($name && $email && $country && $postalAddress) {
+                try {
+                    $stmt = $db->prepare("UPDATE users SET name = ?, email = ?, country = ?, postal_address = ?, accepts_adult_zines = ?, is_admin = ?, email_confirmed = ? WHERE id = ?");
+                    $stmt->execute([$name, $email, $country, $postalAddress, $acceptsAdultZines, $isAdmin, $emailConfirmed, $userId]);
+                    $message = 'User updated successfully!';
+                    $messageType = 'success';
+                } catch (Exception $e) {
+                    $message = 'Update failed. Email may already be in use.';
+                    $messageType = 'error';
+                }
+            } else {
+                $message = 'Please fill in all required fields.';
                 $messageType = 'error';
             }
-        } else {
-            $message = 'Please fill in all required fields.';
-            $messageType = 'error';
         }
     }
     
     if (isset($_POST['delete_user'])) {
         $userId = (int)$_POST['user_id'];
-        
-        try {
-            // Get user's uploaded images
-            $stmt = $db->prepare("SELECT image_path FROM gallery WHERE user_id = ?");
-            $stmt->execute([$userId]);
-            $images = $stmt->fetchAll();
-            
-            // Delete image files
-            foreach ($images as $image) {
-                $imagePath = '../' . $image['image_path'];
-                if (file_exists($imagePath)) {
-                    unlink($imagePath);
-                }
-            }
-            
-            // Delete from database (cascade will handle related records)
-            $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
-            $stmt->execute([$userId]);
-            
-            $message = 'User and all associated data deleted successfully!';
-            $messageType = 'success';
-        } catch (Exception $e) {
-            $message = 'Delete failed: ' . $e->getMessage();
+
+        if ($userId === (int)$_SESSION['user_id']) {
+            $message = 'You cannot delete your own account.';
             $messageType = 'error';
+        } else {
+            try {
+                // Get user's uploaded images
+                $stmt = $db->prepare("SELECT image_path FROM gallery WHERE user_id = ?");
+                $stmt->execute([$userId]);
+                $images = $stmt->fetchAll();
+
+                // Delete image files
+                foreach ($images as $image) {
+                    $imagePath = '../' . $image['image_path'];
+                    if (file_exists($imagePath)) {
+                        unlink($imagePath);
+                    }
+                }
+
+                // Delete from database (cascade will handle related records)
+                $stmt = $db->prepare("DELETE FROM users WHERE id = ?");
+                $stmt->execute([$userId]);
+
+                $message = 'User and all associated data deleted successfully!';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                $message = 'Delete failed: ' . $e->getMessage();
+                $messageType = 'error';
+            }
         }
     }
     
@@ -225,6 +250,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $emailCount = 0;
         foreach ($pairedUsers as $user) {
             $token = bin2hex(random_bytes(16));
+            $tokenExpires = date('Y-m-d H:i:s', strtotime('+14 days'));
             $partnerInfo = "Email: " . $user['partner_email'] . "\n" . $user['partner_address'];
             $emailBody = getPairingEmail($user['name'], $user['partner_name'], $partnerInfo, $user['partner_country'], $token);
             if (sendEmail($user['email'], 'Your Exchange Pairing', $emailBody)) {
@@ -232,8 +258,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 logEmail($user['user_id'], $cycleId, 'pairing_notification');
 
                 // Store token for confirmation
-                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ? WHERE cycle_id = ? AND user_id = ?");
-                $stmt->execute([$token, $cycleId, $user['user_id']]);
+                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$token, $tokenExpires, $cycleId, $user['user_id']]);
             }
         }
 
@@ -275,22 +301,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Handle resending confirmation email
     if (isset($_POST['resend_confirmation'])) {
         $userId = (int)$_POST['user_id'];
-        
+
         // Get user details
         $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
         $stmt->execute([$userId]);
         $user = $stmt->fetch();
-        
+
         if (!$user) {
             $message = 'User not found.';
             $messageType = 'error';
         } else {
             // Generate new confirmation token
             $confirmationToken = bin2hex(random_bytes(16));
-            
+            $tokenExpires = date('Y-m-d H:i:s', strtotime('+48 hours'));
+
             // Update user's confirmation token
-            $stmt = $db->prepare("UPDATE users SET email_confirmation_token = ? WHERE id = ?");
-            $stmt->execute([$confirmationToken, $userId]);
+            $stmt = $db->prepare("UPDATE users SET email_confirmation_token = ?, email_token_expires = ? WHERE id = ?");
+            $stmt->execute([$confirmationToken, $tokenExpires, $userId]);
             
             // Send confirmation email
             $emailBody = getRegistrationEmail($user['name'], $confirmationToken);
@@ -465,7 +492,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                 <?php $csrf = generateCsrfToken(); ?>
                                                 <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
-                                            <button type="submit" name="resend_pairing_emails" class="btn-small">Resend Paring Emails</button>
+                                            <button type="submit" name="resend_pairing_emails" class="btn-small">Resend Pairing Emails</button>
                                         </form>
                                         <?php endif; ?>
                                         

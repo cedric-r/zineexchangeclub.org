@@ -46,7 +46,6 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
         
         // Create ordered list prioritizing same-country pairs
         $ordered = [];
-        $paired = [];
         $remaining = [];
         
         foreach ($byCountry as $country => $userIds) {
@@ -55,8 +54,6 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
                 for ($i = 0; $i < count($userIds) - 1; $i += 2) {
                     $ordered[] = $userIds[$i];
                     $ordered[] = $userIds[$i + 1];
-                    $paired[] = $userIds[$i];
-                    $paired[] = $userIds[$i + 1];
                 }
                 if (count($userIds) % 2 == 1) {
                     // Odd number, save last one for cross-country pairing
@@ -199,7 +196,6 @@ class ZineTypeAlgorithm implements PairingAlgorithm {
         
         // Create ordered list prioritizing same-format pairs
         $ordered = [];
-        $paired = [];
         $remaining = [];
         
         foreach ($byFormat as $format => $userIds) {
@@ -208,8 +204,6 @@ class ZineTypeAlgorithm implements PairingAlgorithm {
                 for ($i = 0; $i < count($userIds) - 1; $i += 2) {
                     $ordered[] = $userIds[$i];
                     $ordered[] = $userIds[$i + 1];
-                    $paired[] = $userIds[$i];
-                    $paired[] = $userIds[$i + 1];
                 }
                 if (count($userIds) % 2 == 1) {
                     // Odd number, save last one for cross-format pairing
@@ -277,7 +271,6 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
         
         // Create ordered list prioritizing same country + same format pairs
         $ordered = [];
-        $paired = [];
         $remaining = [];
         
         foreach ($byCountryAndFormat as $groupKey => $userIds) {
@@ -286,8 +279,6 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
                 for ($i = 0; $i < count($userIds) - 1; $i += 2) {
                     $ordered[] = $userIds[$i];
                     $ordered[] = $userIds[$i + 1];
-                    $paired[] = $userIds[$i];
-                    $paired[] = $userIds[$i + 1];
                 }
                 if (count($userIds) % 2 == 1) {
                     // Odd number, save last one for lower priority pairing
@@ -377,14 +368,15 @@ function pairParticipants($cycleId, $db) {
 
             foreach ($pairedUsers as $user) {
                 $token = bin2hex(random_bytes(16));
+                $tokenExpires = date('Y-m-d H:i:s', strtotime('+14 days'));
                 $partnerInfo = "Email: " . $user['partner_email'] . "\n" . $user['partner_address'];
                 $emailBody = getPairingEmail($user['name'], $user['partner_name'], $partnerInfo, $user['partner_country'], $token);
                 sendEmail($user['email'], 'You\'ve Been Paired!', $emailBody);
                 logEmail($user['user_id'], $cycleId, 'pairing_notification');
 
                 // Store token for confirmation
-                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ? WHERE cycle_id = ? AND user_id = ?");
-                $stmt->execute([$token, $cycleId, $user['user_id']]);
+                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$token, $tokenExpires, $cycleId, $user['user_id']]);
             }
         }
 

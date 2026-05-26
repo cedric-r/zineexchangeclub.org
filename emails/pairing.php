@@ -16,7 +16,7 @@
         <p>Great news! You've been paired with another participant for this exchange cycle. Here are the details:</p>
 
         <div class='address-box'>
-            <h3>Your Exchange Partner: <?= $partnerName ?></h3>
+            <h3>Your Exchange Partner: <?= htmlspecialchars($partnerName) ?></h3>
             <p><strong>Country:</strong> <?= htmlspecialchars($partnerCountry) ?></p>
             <p>Send your zine to this address:</p>
             <p><?= nl2br(htmlspecialchars($partnerAddress)) ?></p>

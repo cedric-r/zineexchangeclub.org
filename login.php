@@ -9,19 +9,29 @@ if (isLoggedIn()) {
 
 $error = '';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+// Rate limiting: max 5 attempts per 15 minutes
+$rateLimitKey = 'login_attempts';
+if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked_until']) {
+    $error = 'Too many failed login attempts. Please try again later.';
+} elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
     }
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
-    
+
     $result = login($email, $password);
-    
+
     if ($result['success']) {
+        unset($_SESSION[$rateLimitKey]);
+        unset($_SESSION['login_blocked_until']);
         header('Location: process.php');
         exit;
     } else {
+        $_SESSION[$rateLimitKey] = ($_SESSION[$rateLimitKey] ?? 0) + 1;
+        if ($_SESSION[$rateLimitKey] >= 5) {
+            $_SESSION['login_blocked_until'] = time() + 900; // 15 minute block
+        }
         $error = $result['message'];
     }
 }

@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $confirmPassword = $_POST['confirm_password'] ?? '';
     $token = $_POST['token'] ?? '';
     
-    if (empty($password) || empty($confirmPassword)) {
+    if (empty($password) || empty($confirmPassword) || empty($token)) {
         $error = 'Please fill in all fields.';
     } elseif (strlen($password) < 8) {
         $error = 'Password must be at least 8 characters long.';

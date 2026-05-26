@@ -30,7 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['token'] ?? '';
 
         // Validate token matches the stored confirmation token
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND participation_confirmed = 0");
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND participation_confirmed = 0 AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
         $stmt->execute([$cycleId, $userId, $token]);
 
         if ($stmt->fetch()) {
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $token = $_POST['token'] ?? '';
 
         // Validate token matches the stored confirmation token
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL");
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
         $stmt->execute([$cycleId, $userId, $token]);
 
         if ($stmt->fetch()) {

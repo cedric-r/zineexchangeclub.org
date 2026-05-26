@@ -1,7 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 *)"
+      "Bash(python3 *)",
+      "Bash(php -l forgot-password.php)",
+      "Bash(php -l login.php)",
+      "Bash(php -l includes/email.php)",
+      "Bash(php -l admin/index.php)",
+      "Bash(php -l index.php)",
+      "Bash(php -l confirm-email.php)",
+      "Bash(php -l confirm-pairing.php)",
+      "Bash(php -l includes/header.php)",
+      "Bash(php -l confirm-participation.php)",
+      "Bash(php -l register.php)",
+      "Bash(php -l reset-password.php)",
+      "Bash(php -l process.php)"
     ]
   }
 }

@@ -13,7 +13,7 @@ if ($token) {
         SELECT cp.id, cp.user_id, cp.cycle_id, c.name
         FROM cycle_participations cp
         JOIN cycles c ON cp.cycle_id = c.id
-        WHERE cp.confirmation_token = ? AND cp.participation_confirmed = 0
+        WHERE cp.confirmation_token = ? AND cp.participation_confirmed = 0 AND (cp.confirmation_token_expires IS NULL OR cp.confirmation_token_expires > NOW())
     ");
     $stmt->execute([$token]);
     $participation = $stmt->fetch();

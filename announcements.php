@@ -243,7 +243,7 @@ if (!empty($announcementIds)) {
                                 <div class="announcement-meta">
                                     <span class="date">Posted: <?php echo date('F j, Y g:i A', strtotime($announcement['created_at'])); ?></span>
                                     <span class="author">by <?php echo htmlspecialchars($announcement['created_by_name']); ?></span>
-                                    <?php if ($announcement['updated_at'] !== $announcement['created_at']): ?>
+                                    <?php if (strtotime($announcement['updated_at']) > strtotime($announcement['created_at']) + 5): ?>
                                         <span class="updated">Updated: <?php echo date('F j, Y g:i A', strtotime($announcement['updated_at'])); ?></span>
                                     <?php endif; ?>
                                     <?php if ($announcement['email_sent']): ?>
