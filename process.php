@@ -6,6 +6,8 @@ require_once 'includes/functions.php';
 
 requireLogin();
 
+$csrfToken = generateCsrfToken();
+
 $db = getDB();
 $userId = $_SESSION['user_id'];
 $message = '';
@@ -13,9 +15,16 @@ $messageType = '';
 
 // Handle form submissions
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
+    $csrfToken = $_POST['csrf_token'] ?? '';
+
+    // If POST is empty but a file was attempted, post_max_size was likely exceeded
+    if ($csrfToken === '' && isset($_SERVER['CONTENT_TYPE']) && strpos($_SERVER['CONTENT_TYPE'], 'multipart/form-data') !== false && empty($_POST)) {
+        $message = 'The uploaded file exceeds the maximum allowed size.';
+        $messageType = 'error';
+    } elseif (!validateCsrfToken($csrfToken)) {
         die('Invalid CSRF token.');
     }
+
     if (isset($_POST['confirm_participation'])) {
         $cycleId = (int)$_POST['cycle_id'];
         $token = $_POST['token'] ?? '';
@@ -246,8 +255,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                             <p class="status">Status: <span class="open">Registration Open</span></p>
                             
                             <form method="post" class="participation-form">
-                                <?php $csrf = generateCsrfToken(); ?>
-                                <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                <input type="hidden" name="csrf_token" value="<?php echo $csrfToken; ?>">
                                 <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                 <button type="submit" name="want_to_participate" class="btn">I Want to Participate</button>
                             </form>
