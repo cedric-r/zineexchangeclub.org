@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
+require_once 'includes/captcha.php';
 
 $error = '';
 $success = '';
@@ -22,8 +23,10 @@ if ($rateLimited) {
         $error = 'Too many password reset requests. Please try again later.';
     } else {
         $email = trim($_POST['email'] ?? '');
-    
-    if (empty($email)) {
+
+    if (!isCaptchaVerified()) {
+        $error = 'Please complete the captcha verification.';
+    } elseif (empty($email)) {
         $error = 'Please enter your email address.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Invalid email address.';
@@ -61,6 +64,12 @@ if ($rateLimited) {
     }
 }
 }
+
+// Fresh captcha question on every page load; preserve state during POST for verification
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    initCaptcha();
+}
+$captchaData = getCaptchaQuestion();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -108,6 +117,13 @@ if ($rateLimited) {
                         <input type="email" id="email" name="email" required>
                     </div>
                     
+                    <div id="captcha-container" class="form-group">
+                        <label>Verify you are human</label>
+                        <p class="captcha-question"><strong><?php echo htmlspecialchars($captchaData['question'] ?? 'No question available.'); ?></strong></p>
+                        <input type="text" class="captcha-answer" placeholder="Enter your answer" autocomplete="off">
+                        <div class="captcha-status"></div>
+                    </div>
+
                     <button type="submit" class="btn">Send Reset Link</button>
                 </form>
             <?php endif; ?>
@@ -116,6 +132,7 @@ if ($rateLimited) {
         </main>
         
         <?php require_once 'includes/footer.php'; ?>
+    <script src="js/captcha.js"></script>
     </div>
 </body>
 </html>

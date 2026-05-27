@@ -2,6 +2,7 @@
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
+require_once 'includes/captcha.php';
 
 $error = '';
 $success = '';
@@ -30,6 +31,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Password must be at least 8 characters long.';
     } elseif ($password !== $confirmPassword) {
         $error = 'Passwords do not match.';
+    } elseif (!isCaptchaVerified()) {
+        $error = 'Please complete the captcha verification.';
     } else {
         $db = getDB();
         
@@ -82,6 +85,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 }
+
+// Fresh captcha question on every page load; preserve state during POST for verification
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    initCaptcha();
+}
+$captchaData = getCaptchaQuestion();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -179,14 +188,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         </select>
                     </div>
                     
+                    <div id="captcha-container" class="form-group">
+                        <label>Verify you are human</label>
+                        <p class="captcha-question"><strong><?php echo htmlspecialchars($captchaData['question'] ?? 'No question available.'); ?></strong></p>
+                        <input type="text" class="captcha-answer" placeholder="Enter your answer" autocomplete="off">
+                        <div class="captcha-status"></div>
+                    </div>
+
                     <button type="submit" class="btn">Register</button>
                 </form>
             <?php endif; ?>
         </main>
-        
+
         <footer>
             <p>&copy; <?php echo date('Y'); ?> Zine Exchange Club</p>
         <?php require_once 'includes/footer.php'; ?>
+    <script src="js/captcha.js"></script>
     </div>
 </body>
 </html>

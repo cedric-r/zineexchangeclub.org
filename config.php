@@ -21,6 +21,9 @@ define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
 // Pairing algorithm configuration
 define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
 
+// Captcha configuration
+define('CAPTCHA_MAX_RETRIES', 3);
+
 // Session configuration
 ini_set('session.cookie_httponly', 1);
 ini_set('session.use_only_cookies', 1);

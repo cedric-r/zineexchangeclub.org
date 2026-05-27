@@ -1,6 +1,7 @@
 <?php
 require_once 'config.php';
 require_once 'includes/auth.php';
+require_once 'includes/captcha.php';
 
 if (isLoggedIn()) {
     header('Location: process.php');
@@ -17,6 +18,10 @@ if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
     }
+
+    if (!isCaptchaVerified()) {
+        $error = 'Please complete the captcha verification.';
+    } else {
     $email = trim($_POST['email'] ?? '');
     $password = $_POST['password'] ?? '';
 
@@ -33,8 +38,15 @@ if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked
             $_SESSION['login_blocked_until'] = time() + 900; // 15 minute block
         }
         $error = $result['message'];
+        }
     }
 }
+
+// Fresh captcha question on every page load; preserve state during POST for verification
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    initCaptcha();
+}
+$captchaData = getCaptchaQuestion();
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -82,6 +94,13 @@ if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked
                     <input type="password" id="password" name="password" required>
                 </div>
                 
+                <div id="captcha-container" class="form-group">
+                    <label>Verify you are human</label>
+                    <p class="captcha-question"><strong><?php echo htmlspecialchars($captchaData['question'] ?? 'No question available.'); ?></strong></p>
+                    <input type="text" class="captcha-answer" placeholder="Enter your answer" autocomplete="off">
+                    <div class="captcha-status"></div>
+                </div>
+
                 <button type="submit" class="btn">Login</button>
             </form>
             
@@ -90,6 +109,7 @@ if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked
         </main>
         
         <?php require_once 'includes/footer.php'; ?>
+    <script src="js/captcha.js"></script>
     </div>
 </body>
 </html>
