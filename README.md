@@ -14,6 +14,7 @@ A zine exchange coordination system built in vanilla PHP. This platform allows z
 - **Admin Dashboard**: Complete admin interface for managing users, cycles, and monitoring progress
 - **Reminder System**: Crontab scripts to remind users about posting and receiving zines
 - **Mobile Responsive**: Airy, modern design that works on all devices
+- **Bot Protection**: Question-based captcha on registration, login, and password reset forms with configurable retry limit
 
 ## Requirements
 
@@ -60,6 +61,9 @@ define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random',
 
 // Admin configuration
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
+
+// Captcha configuration
+define('CAPTCHA_MAX_RETRIES', 3); // Max failed attempts before blocking form
 ```
 
 ### 3. File Permissions
@@ -136,13 +140,18 @@ zineexchangeclub.org/
 │   └── style.css             # Main stylesheet
 ├── includes/
 │   ├── auth.php              # Authentication functions
+│   ├── captcha.php           # Captcha question selection and verification
 │   └── email.php             # Email sending functions
+├── js/
+│   └── captcha.js            # Frontend captcha verification with AJAX
 ├── scripts/
 │   ├── crontab-example.txt   # Example crontab configuration
 │   ├── reminder-posting.php  # Reminder for posting zines
 │   └── reminder-receiving.php # Reminder for receiving zines
 ├── uploads/                  # Gallery images (create this directory)
 ├── .htaccess                 # Apache configuration
+├── captcha.json              # Captcha question/answer pairs
+├── captcha.php               # Captcha JSON API endpoint
 ├── config.php                # Main configuration file
 ├── confirm-email.php         # Email confirmation page
 ├── confirm-participation.php # Participation confirmation page
@@ -223,6 +232,9 @@ The system sends emails at these stages:
 
 - Passwords are hashed using PHP's `password_hash()`
 - Email confirmation required for registration
+- Session-based rate limiting on login (5 attempts per 15 min) and password reset (3 per 15 min)
+- Question-based captcha on registration, login, and forgot-password forms prevents automated submissions
+- Captcha verification is server-side authoritative (session flag, not hidden fields)
 - Session security configured
 - Sensitive files protected via .htaccess
 - SQL injection prevention using prepared statements
