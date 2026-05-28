@@ -12,7 +12,7 @@
         <h2>Password Reset Request</h2>
         <p>Hello <?= $name ?>!</p>
 
-        <p>We received a request to reset your password for the Zine Exchange Club. If you didn't make this request, you can safely ignore this email.</p>
+        <p>We received a request to reset your password for the <?= SITE_TITLE ?>. If you didn't make this request, you can safely ignore this email.</p>
 
         <p>To reset your password, click the button below. This link will expire in 1 hour:</p>
 

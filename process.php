@@ -108,12 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             if ($recipient) {
                 $emailBody = getZinePostedEmail($recipient['name']);
-                sendEmail($recipient['email'], 'A zine is on its way to you! - Zine Exchange Club', $emailBody);
+                sendEmail($recipient['email'], 'A ' . CONTENT_TYPE . ' is on its way to you! - ' . SITE_TITLE, $emailBody);
                 logEmail($recipient['id'], $cycleId, 'zine_posted_notification');
             }
         }
         
-        $message = 'Zine sent reported successfully!';
+        $message = ucfirst(CONTENT_TYPE) . ' sent reported successfully!';
         $messageType = 'success';
     }
     
@@ -122,7 +122,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         $stmt = $db->prepare("UPDATE cycle_participations SET zine_received = 1, zine_received_date = CURDATE() WHERE cycle_id = ? AND user_id = ?");
         $stmt->execute([$cycleId, $userId]);
-        $message = 'Zine received reported successfully!';
+        $message = ucfirst(CONTENT_TYPE) . ' received reported successfully!';
         $messageType = 'success';
     }
     
@@ -237,7 +237,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
             
             <?php if ($zine): ?>
                 <section class="my-zine">
-                    <h2>My Zine</h2>
+                    <h2>My <?php echo ucfirst(CONTENT_TYPE); ?></h2>
                     <p><strong>Theme:</strong> <?php echo htmlspecialchars($zine['theme']); ?></p>
                     <p><strong>Format:</strong> <?php echo htmlspecialchars($zine['format']); ?></p>
                 </section>
@@ -306,7 +306,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                 
                                 <div class="step <?php echo $p['zine_sent'] ? 'completed' : 'pending'; ?>">
                                     <span class="step-icon"><?php echo $p['zine_sent'] ? '✓' : '○'; ?></span>
-                                    <span class="step-label">Zine Sent</span>
+                                    <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Sent</span>
                                     <?php if ($p['pairing_done'] && !$p['zine_sent']): ?>
                                         <form method="post" class="inline-form">
                                             <?php $csrf = generateCsrfToken(); ?>
@@ -319,7 +319,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                 
                                 <div class="step <?php echo $p['zine_received'] ? 'completed' : 'pending'; ?>">
                                     <span class="step-icon"><?php echo $p['zine_received'] ? '✓' : '○'; ?></span>
-                                    <span class="step-label">Zine Received</span>
+                                    <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Received</span>
                                     <?php if ($p['zine_sent'] && !$p['zine_received']): ?>
                                         <form method="post" class="inline-form">
                                             <?php $csrf = generateCsrfToken(); ?>
@@ -344,7 +344,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                             
                             <?php if ($p['zine_received']): ?>
                                 <div class="upload-section">
-                                    <h4>Upload Photo of Received Zine</h4>
+                                    <h4>Upload Photo of Received <?php echo ucfirst(CONTENT_TYPE); ?></h4>
                                     <form method="post" enctype="multipart/form-data" class="form">
                                         <?php $csrf = generateCsrfToken(); ?>
                                         <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
@@ -371,7 +371,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                     <h2>Need Help?</h2>
                     <div class="contact-box">
                         <h3>Contact Administrator</h3>
-                        <p>If you have any questions or issues with the zine exchange process, please contact the administrator:</p>
+                        <p>If you have any questions or issues with the <?php echo CONTENT_TYPE; ?> exchange process, please contact the administrator:</p>
                         <div class="contact-details">
                             <p><strong>Email:</strong> <a href="mailto:<?php echo htmlspecialchars(ADMIN_EMAIL); ?>"><?php echo htmlspecialchars(ADMIN_EMAIL); ?></a></p>
                             <p><strong>Response Time:</strong> We'll respond to your inquiry within 24-48 hours.</p>

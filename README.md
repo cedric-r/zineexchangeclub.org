@@ -4,7 +4,7 @@ A zine exchange coordination system built in vanilla PHP. This platform allows z
 
 ## Features
 
-- **User Registration**: Users can register with their personal information and zine details
+- **User Registration**: Users can register with their personal information
 - **Email Confirmation**: Email verification for new registrations
 - **Cycle Management**: Administrators can create exchange cycles
 - **Plugin-Based Pairing**: Multiple pairing algorithms including random, country-based, and zine-type matching
@@ -55,6 +55,7 @@ define('SITE_URL', 'http://yourdomain.com');
 
 // Site configuration
 define('SITE_TITLE', 'Zine Exchange Club');
+define('CONTENT_TYPE', 'zine'); // Type of content exchanged: 'zine' or 'postcard'
 
 // Pairing algorithm configuration
 define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
@@ -242,11 +243,20 @@ The system sends emails at these stages:
 
 ## Customization
 
+### Content Type
+
+The site uses `CONTENT_TYPE` to determine the terminology throughout all pages and emails. Set it in `config.php`:
+```php
+define('CONTENT_TYPE', 'zine'); // Options: 'zine' or 'postcard'
+```
+This changes all user-facing references from "zine" to "postcard" (e.g., "zine gallery" → "postcard gallery", "send your zine" → "send your postcard").
+
 ### Site Title
 
 Change the site title by updating the `SITE_TITLE` constant in `config.php`:
 ```php
 define('SITE_TITLE', 'Your Zine Exchange Name');
+define('CONTENT_TYPE', 'zine');
 ```
 This will update the site name throughout all pages and emails.
 

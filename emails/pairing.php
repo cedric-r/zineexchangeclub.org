@@ -18,17 +18,17 @@
         <div class='address-box'>
             <h3>Your Exchange Partner: <?= htmlspecialchars($partnerName) ?></h3>
             <p><strong>Country:</strong> <?= htmlspecialchars($partnerCountry) ?></p>
-            <p>Send your zine to this address:</p>
+            <p>Send your <?= CONTENT_TYPE ?> to this address:</p>
             <p><?= nl2br(htmlspecialchars($partnerAddress)) ?></p>
         </div>
 
         <p><strong>Next steps:</strong></p>
         <ol>
-            <li>Prepare your zine for mailing</li>
+            <li>Prepare your <?= CONTENT_TYPE ?> for mailing</li>
             <li>Send it to the address above</li>
-            <li>Log in to the site and report when you've sent your zine</li>
-            <li>Wait to receive a zine from another participant</li>
-            <li>Report when you've received your zine</li>
+            <li>Log in to the site and report when you've sent your <?= CONTENT_TYPE ?></li>
+            <li>Wait to receive a <?= CONTENT_TYPE ?> from another participant</li>
+            <li>Report when you've received your <?= CONTENT_TYPE ?></li>
         </ol>
 
         <p>Please confirm that you've received this pairing information by clicking the button below:</p>
@@ -38,7 +38,7 @@
         <p>If the button doesn't work, copy and paste this link into your browser:</p>
         <p><?= $confirmUrl ?></p>
 
-        <p>Happy zine exchanging!</p>
+        <p>Happy <?= CONTENT_TYPE ?> exchanging!</p>
         <p>The <?= SITE_TITLE ?> Team</p>
     </div>
 </body>

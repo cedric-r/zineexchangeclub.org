@@ -14,6 +14,7 @@ define('SITE_URL', 'http://localhost'); // Change to actual domain
 
 // Site configuration
 define('SITE_TITLE', 'Zine Exchange Club');
+define('CONTENT_TYPE', 'zine'); // Type of content exchanged: 'zine' or 'postcard'
 
 // Admin configuration
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');

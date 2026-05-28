@@ -24,7 +24,7 @@
 
             <p>This is a friendly reminder that you haven't yet confirmed your participation in the <strong><?= $cycleName ?></strong> exchange cycle.</p>
 
-            <p>If you'd like to participate in this cycle and exchange zines with fellow creators, Please confirm Your participation by clicking the button below:</p>
+            <p>If you'd like to participate in this cycle and exchange <?= CONTENT_TYPE ?>s with fellow creators, Please confirm Your participation by clicking the button below:</p>
 
             <a href='<?= $confirmUrl ?>' class='button'>Confirm My Participation</a>
 
@@ -34,7 +34,7 @@
 
             <p>If you have any questions, feel free to contact us.</p>
 
-            <p>Happy zine making!</p>
+            <p>Happy <?= CONTENT_TYPE ?> making!</p>
 
             <p>The <?= SITE_TITLE ?> Team</p>
         </div>

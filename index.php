@@ -70,7 +70,7 @@ if (isLoggedIn()) {
         <main>
             <section class="hero">
                 <h1>Welcome to the <?php echo SITE_TITLE; ?></h1>
-                <p>Connect with fellow photography zine makers and exchange your creations with enthusiasts around the world.</p>
+                <p>Connect with fellow photography <?php echo CONTENT_TYPE; ?> makers and exchange your creations with enthusiasts around the world.</p>
                 <?php if (!isLoggedIn()): ?>
                     <a href="register.php" class="btn btn-large">Join the Club</a>
                 <?php else: ?>
@@ -111,7 +111,7 @@ if (isLoggedIn()) {
                     <div class="process-card">
                         <div class="card-number">1</div>
                         <h3>Register</h3>
-                        <p>Sign up and tell us about yourself and the photography zine you create. Describe your zine's theme, format, and construction type.</p>
+                        <p>Sign up and tell us about yourself and the photography <?php echo CONTENT_TYPE; ?> you create. Describe your <?php echo CONTENT_TYPE; ?>'s theme, format, and construction type.</p>
                     </div>
                     
                     <div class="arrow">→</div>
@@ -135,7 +135,7 @@ if (isLoggedIn()) {
                     <div class="process-card">
                         <div class="card-number">4</div>
                         <h3>Send & Receive</h3>
-                        <p>Send your zine to your paired partner and receive one from another participant. Report your progress on the site.</p>
+                        <p>Send your <?php echo CONTENT_TYPE; ?> to your paired partner and receive one from another participant. Report your progress on the site.</p>
                     </div>
                     
                     <div class="arrow">→</div>
@@ -143,15 +143,15 @@ if (isLoggedIn()) {
                     <div class="process-card">
                         <div class="card-number">5</div>
                         <h3>Share</h3>
-                        <p>Upload photos of the zine you received to our gallery and see what others in the community have created.</p>
+                        <p>Upload photos of the <?php echo CONTENT_TYPE; ?> you received to our gallery and see what others in the community have created.</p>
                     </div>
                 </div>
             </section>
             
             <section class="about">
                 <h2>About the <?php echo SITE_TITLE; ?></h2>
-                <p>The <?php echo SITE_TITLE; ?> is a community for photography zine makers to share their work with fellow enthusiasts around the world. Our exchange cycles bring creators together, fostering connections and spreading the joy of independent publishing.</p>
-                <p>Whether you make photocopied zines, hand-bound artist books, or anything in between, there's a place for you here. Join us and become part of a global network of zine creators!</p>
+                <p>The <?php echo SITE_TITLE; ?> is a community for photography <?php echo CONTENT_TYPE; ?> makers to share their work with fellow enthusiasts around the world. Our exchange cycles bring creators together, fostering connections and spreading the joy of independent publishing.</p>
+                <p>Whether you make photocopied <?php echo CONTENT_TYPE; ?>s, hand-bound artist books, or anything in between, there's a place for you here. Join us and become part of a global network of <?php echo CONTENT_TYPE; ?> creators!</p>
             </section>
         </main>
         

@@ -7,7 +7,7 @@
 </head>
 <body>
     <div class='container'>
-        <h2>Reminder: Zine Exchange Club</h2>
+        <h2>Reminder: <?= SITE_TITLE ?></h2>
         <p>Hello <?= $name ?>!</p>
 
         <p><?= $message ?></p>

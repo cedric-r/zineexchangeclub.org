@@ -59,16 +59,16 @@ if (isLoggedIn()) {
         </nav>
         
         <main>
-            <h1>Zine Gallery</h1>
-            <p class="subtitle">Photos of zines received by our participants</p>
-            
+            <h1><?php echo ucfirst(CONTENT_TYPE); ?> Gallery</h1>
+            <p class="subtitle">Photos of <?php echo CONTENT_TYPE; ?>s received by our participants</p>
+
             <?php if (empty($galleryItems)): ?>
-                <p class="empty-state">No zines have been uploaded to the gallery yet. Check back soon!</p>
+                <p class="empty-state">No <?php echo CONTENT_TYPE; ?>s have been uploaded to the gallery yet. Check back soon!</p>
             <?php else: ?>
                 <div class="gallery-grid">
                     <?php foreach ($galleryItems as $item): ?>
                         <div class="gallery-item">
-                            <img src="<?php echo htmlspecialchars($item['image_path']); ?>" alt="Zine photo"
+                            <img src="<?php echo htmlspecialchars($item['image_path']); ?>" alt="<?php echo ucfirst(CONTENT_TYPE); ?> photo"
                                  onclick="openLightbox(this, '<?php echo htmlspecialchars($item['caption'] ?? ''); ?>', '<?php echo htmlspecialchars($item['user_name']); ?>', '<?php echo htmlspecialchars($item['cycle_name']); ?>')">
                             <div class="gallery-info">
                                 <p class="by">by <?php echo htmlspecialchars($item['user_name']); ?></p>

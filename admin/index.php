@@ -663,8 +663,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         <th>Confirmed</th>
                                         <th>Paired With</th>
                                         <th>Acknowledged</th>
-                                        <th>Zine Sent</th>
-                                        <th>Zine Received</th>
+                                        <th><?php echo ucfirst(CONTENT_TYPE); ?> Sent</th>
+                                        <th><?php echo ucfirst(CONTENT_TYPE); ?> Received</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -756,8 +756,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                 <th>Confirmed</th>
                                                 <th>Paired With</th>
                                                 <th>Acknowledged</th>
-                                                <th>Zine Sent</th>
-                                                <th>Zine Received</th>
+                                                <th><?php echo ucfirst(CONTENT_TYPE); ?> Sent</th>
+                                                <th><?php echo ucfirst(CONTENT_TYPE); ?> Received</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -811,7 +811,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                 <?php endif; ?>
             </section>
         </main>
-        
+
         <!-- User Edit Modal -->
         <div id="userEditModal" class="modal" style="display: none;">
             <div class="modal-content">
@@ -841,7 +841,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                     </div>
                     <div class="form-group checkbox">
                         <input type="checkbox" id="edit_accepts_adult_zines" name="accepts_adult_zines">
-                        <label for="edit_accepts_adult_zines">Accepts Adult Zines</label>
+                        <label for="edit_accepts_adult_zines">Accepts Adult <?php echo ucfirst(CONTENT_TYPE); ?>s</label>
                     </div>
                     <div class="form-group checkbox">
                         <input type="checkbox" id="edit_is_admin" name="is_admin">

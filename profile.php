@@ -143,7 +143,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                     
                     <div class="form-group checkbox">
                         <input type="checkbox" id="accepts_adult_zines" name="accepts_adult_zines" <?php echo $user['accepts_adult_zines'] ? 'checked' : ''; ?>>
-                        <label for="accepts_adult_zines">I accept to receive adult-themed zines</label>
+                        <label for="accepts_adult_zines">I accept to receive adult-themed <?php echo CONTENT_TYPE; ?>s</label>
                     </div>
                     
                     <button type="submit" class="btn">Update Profile</button>

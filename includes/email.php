@@ -133,9 +133,9 @@ function getZinePostedEmail($name) {
 
 function getReminderEmail($name, $reminderType) {
     if ($reminderType === 'post_zine') {
-        $message = "This is a reminder that you haven't yet reported sending your zine to your exchange partner. Please send your zine as soon as possible and log in to the site to report that you've sent it.";
+        $message = "This is a reminder that you haven't yet reported sending your " . CONTENT_TYPE . " to your exchange partner. Please send your " . CONTENT_TYPE . " as soon as possible and log in to the site to report that you've sent it.";
     } elseif ($reminderType === 'receive_zine') {
-        $message = "This is a reminder that you haven't yet reported receiving your zine. If you've received it, please log in to the site and report it. If you haven't received it yet, please wait a bit longer - international mail can take time.";
+        $message = "This is a reminder that you haven't yet reported receiving your " . CONTENT_TYPE . ". If you've received it, please log in to the site and report it. If you haven't received it yet, please wait a bit longer - international mail can take time.";
     }
 
     return renderEmailTemplate('reminder', [

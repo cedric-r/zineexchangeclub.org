@@ -51,7 +51,7 @@ if ($rateLimited) {
                 
                 // Send reset email
                 $emailBody = getPasswordResetEmail($user['name'], $token);
-                if (sendEmail($email, 'Password Reset - Zine Exchange Club', $emailBody)) {
+                if (sendEmail($email, 'Password Reset - ' . SITE_TITLE, $emailBody)) {
                     $success = 'Password reset link has been sent to your email. The link will expire in 1 hour.';
                 } else {
                     $error = 'There was an error sending the reset email. Please try again.';
@@ -76,7 +76,7 @@ $captchaData = getCaptchaQuestion();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Forgot Password - Zine Exchange Club</title>
+    <title>Forgot Password - <?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="css/style.css">
 </head>
 <body>

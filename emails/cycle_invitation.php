@@ -23,7 +23,7 @@
 
         <p>If you don't want to participate in this cycle, simply ignore this email. Your account will remain active for future cycles.</p>
 
-        <p>Happy zine exchanging!</p>
+        <p>Happy <?= CONTENT_TYPE ?> exchanging!</p>
         <p>The <?= SITE_TITLE ?> Team</p>
     </div>
 </body>

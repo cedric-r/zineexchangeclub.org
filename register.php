@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 
                 // Send confirmation email
                 $emailBody = getRegistrationEmail($name, $confirmationToken);
-                if (sendEmail($email, 'Confirm your email - Zine Exchange Club', $emailBody)) {
+                if (sendEmail($email, 'Confirm your email - ' . SITE_TITLE, $emailBody)) {
                     $success = 'Registration successful! Please check your email to confirm your account.';
                 } else {
                     $success = 'Registration successful! However, there was an error sending the confirmation email. Please contact support.';
@@ -162,7 +162,7 @@ $captchaData = getCaptchaQuestion();
                     
                     <div class="form-group checkbox">
                         <input type="checkbox" id="accepts_adult_zines" name="accepts_adult_zines" <?php echo isset($_POST['accepts_adult_zines']) ? 'checked' : ''; ?>>
-                        <label for="accepts_adult_zines">I accept to receive adult-themed zines</label>
+                        <label for="accepts_adult_zines">I accept to receive adult-themed <?php echo CONTENT_TYPE; ?>s</label>
                     </div>
                     
                     

@@ -37,7 +37,7 @@ foreach ($users as $user) {
 
     if (!$recentReminder) {
         $emailBody = getReminderEmail($user['name'], 'receive_zine');
-        sendEmail($user['email'], 'Reminder: Report received zine - Zine Exchange Club', $emailBody);
+        sendEmail($user['email'], 'Reminder: Report received ' . CONTENT_TYPE . ' - ' . SITE_TITLE, $emailBody);
         logEmail($user['user_id'], $user['cycle_id'], 'reminder_receive');
         echo "Reminder sent to: {$user['email']}\n";
     }
