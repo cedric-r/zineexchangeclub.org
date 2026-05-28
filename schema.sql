@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS users (
     is_admin TINYINT(1) DEFAULT 0,
     email_confirmed TINYINT(1) DEFAULT 0,
     email_confirmation_token VARCHAR(64) DEFAULT NULL,
+    email_token_expires DATETIME DEFAULT NULL,
     password_reset_token VARCHAR(64) DEFAULT NULL,
     password_reset_expires DATETIME DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -20,8 +21,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS zines (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
-    theme TEXT NOT NULL,
-    format VARCHAR(50) NOT NULL,
+    theme TEXT DEFAULT NULL,
+    format VARCHAR(50) DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -49,6 +50,7 @@ CREATE TABLE IF NOT EXISTS cycle_participations (
     zine_received TINYINT(1) DEFAULT 0,
     zine_received_date DATE DEFAULT NULL,
     confirmation_token VARCHAR(64) DEFAULT NULL,
+    confirmation_token_expires DATETIME DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,

@@ -18,12 +18,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $postalAddress = trim($_POST['postal_address'] ?? '');
     $acceptsAdultZines = isset($_POST['accepts_adult_zines']) ? 1 : 0;
     $country = trim($_POST['country'] ?? '');
-    $zineTheme = trim($_POST['zine_theme'] ?? '');
-    $zineFormat = trim($_POST['zine_format'] ?? '');
-    
+
     // Validation
-    if (empty($name) || empty($email) || empty($password) || empty($postalAddress) || 
-        empty($country) || empty($zineTheme) || empty($zineFormat)) {
+    if (empty($name) || empty($email) || empty($password) || empty($postalAddress) ||
+        empty($country)) {
         $error = 'All fields are required.';
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $error = 'Invalid email address.';
@@ -54,9 +52,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt->execute([$name, $email, $hashedPassword, $postalAddress, $acceptsAdultZines, $country, $confirmationToken, $tokenExpires]);
                 $userId = $db->lastInsertId();
                 
-                // Create zine entry
-                $stmt = $db->prepare("INSERT INTO zines (user_id, theme, format) VALUES (?, ?, ?)");
-                $stmt->execute([$userId, $zineTheme, $zineFormat]);
                 
                 // Add user to existing open cycles with wants_to_participate=1
                 $stmt = $db->prepare("SELECT id FROM cycles WHERE registration_open = 1 AND status = 'active'");
@@ -170,23 +165,6 @@ $captchaData = getCaptchaQuestion();
                         <label for="accepts_adult_zines">I accept to receive adult-themed zines</label>
                     </div>
                     
-                    <h2>Your Zine</h2>
-                    
-                    <div class="form-group">
-                        <label for="zine_theme">Theme/Description *</label>
-                        <textarea id="zine_theme" name="zine_theme" required rows="4"><?php echo htmlspecialchars($_POST['zine_theme'] ?? ''); ?></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="zine_format">Format *</label>
-                        <select id="zine_format" name="zine_format" required>
-                            <option value="">Select format...</option>
-                            <option value="folded" <?php echo ($_POST['zine_format'] ?? '') === 'folded' ? 'selected' : ''; ?>>Folded</option>
-                            <option value="stapled" <?php echo ($_POST['zine_format'] ?? '') === 'stapled' ? 'selected' : ''; ?>>Stapled</option>
-                            <option value="bound" <?php echo ($_POST['zine_format'] ?? '') === 'bound' ? 'selected' : ''; ?>>Bound</option>
-                            <option value="other" <?php echo ($_POST['zine_format'] ?? '') === 'other' ? 'selected' : ''; ?>>Other</option>
-                        </select>
-                    </div>
                     
                     <div id="captcha-container" class="form-group">
                         <label>Verify you are human</label>
@@ -201,8 +179,7 @@ $captchaData = getCaptchaQuestion();
         </main>
 
         <footer>
-            <p>&copy; <?php echo date('Y'); ?> Zine Exchange Club</p>
-        <?php require_once 'includes/footer.php'; ?>
+	    <?php require_once 'includes/footer.php'; ?>
     <script src="js/captcha.js"></script>
     </div>
 </body>

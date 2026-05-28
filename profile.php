@@ -15,11 +15,6 @@ $stmt = $db->prepare("SELECT * FROM users WHERE id = ?");
 $stmt->execute([$userId]);
 $user = $stmt->fetch();
 
-// Get zine info
-$stmt = $db->prepare("SELECT * FROM zines WHERE user_id = ?");
-$stmt->execute([$userId]);
-$zine = $stmt->fetch();
-
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!validateCsrfToken($_POST['csrf_token'] ?? '')) {
         die('Invalid CSRF token.');
@@ -44,37 +39,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $user = $stmt->fetch();
                 
                 $message = 'Personal information updated successfully!';
-                $messageType = 'success';
-            } catch (Exception $e) {
-                $message = 'Update failed. Please try again.';
-                $messageType = 'error';
-            }
-        }
-    }
-    
-    if (isset($_POST['update_zine_info'])) {
-        $zineTheme = trim($_POST['zine_theme'] ?? '');
-        $zineFormat = trim($_POST['zine_format'] ?? '');
-        
-        if (empty($zineTheme) || empty($zineFormat)) {
-            $message = 'All zine information fields are required.';
-            $messageType = 'error';
-        } else {
-            try {
-                if ($zine) {
-                    $stmt = $db->prepare("UPDATE zines SET theme = ?, format = ? WHERE user_id = ?");
-                    $stmt->execute([$zineTheme, $zineFormat, $userId]);
-                } else {
-                    $stmt = $db->prepare("INSERT INTO zines (user_id, theme, format) VALUES (?, ?, ?)");
-                    $stmt->execute([$userId, $zineTheme, $zineFormat]);
-                }
-                
-                // Refresh data
-                $stmt = $db->prepare("SELECT * FROM zines WHERE user_id = ?");
-                $stmt->execute([$userId]);
-                $zine = $stmt->fetch();
-                
-                $message = 'Zine information updated successfully!';
                 $messageType = 'success';
             } catch (Exception $e) {
                 $message = 'Update failed. Please try again.';
@@ -187,37 +151,12 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
             </section>
             
             <section class="admin-section">
-                <h2>My Zine</h2>
-                <form method="post" class="form">
-                    <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
-                    <input type="hidden" name="update_zine_info" value="1">
-                    
-                    <div class="form-group">
-                        <label for="zine_theme">Theme/Description *</label>
-                        <textarea id="zine_theme" name="zine_theme" required rows="4"><?php echo htmlspecialchars($zine['theme'] ?? ''); ?></textarea>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="zine_format">Format *</label>
-                        <select id="zine_format" name="zine_format" required>
-                            <option value="">Select format...</option>
-                            <option value="folded" <?php echo ($zine['format'] ?? '') === 'folded' ? 'selected' : ''; ?>>Folded</option>
-                            <option value="stapled" <?php echo ($zine['format'] ?? '') === 'stapled' ? 'selected' : ''; ?>>Stapled</option>
-                            <option value="bound" <?php echo ($zine['format'] ?? '') === 'bound' ? 'selected' : ''; ?>>Bound</option>
-                            <option value="other" <?php echo ($zine['format'] ?? '') === 'other' ? 'selected' : ''; ?>>Other</option>
-                        </select>
-                    </div>
-                    
-                    <button type="submit" class="btn">Update Zine Info</button>
-                </form>
-            </section>
-            
-            <section class="admin-section">
                 <h2>Change Password</h2>
                 <form method="post" class="form">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                     <input type="hidden" name="update_password" value="1">
                     
+
                     <div class="form-group">
                         <label for="current_password">Current Password *</label>
                         <input type="password" id="current_password" name="current_password" required>

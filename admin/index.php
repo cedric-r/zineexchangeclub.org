@@ -375,6 +375,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
             </a>
             <a href="../gallery.php">Gallery</a>
             <a href="../process.php">My Process</a>
+            <a href="../profile.php">My Profile</a>
             <a href="../logout.php">Logout</a>
             <a href="index.php" class="active">Admin</a>
         </nav>
