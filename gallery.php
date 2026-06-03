@@ -55,6 +55,7 @@ if (isLoggedIn()) {
             <?php endif; ?>
             <?php if (isAdmin()): ?>
                 <a href="admin/index.php">Admin</a>
+                <a href="admin/gallery.php">Gallery Mgmt</a>
             <?php endif; ?>
         </nav>
         
