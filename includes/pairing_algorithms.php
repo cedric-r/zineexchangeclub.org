@@ -311,6 +311,150 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
 }
 
 /**
+ * Geographic Proximity Algorithm
+ * Tries hard to pair people within the same country or close geographically.
+ * Runs up to 50 iterations with shuffling to find a satisfying solution,
+ * then falls back to random when no geographic pairings are possible.
+ */
+class GeographicProximityAlgorithm implements PairingAlgorithm {
+    private static array $regionMap = [
+        // Europe
+        'united kingdom' => 'europe', 'uk' => 'europe', 'great britain' => 'europe', 'england' => 'europe',
+        'france' => 'europe', 'germany' => 'europe', 'italy' => 'europe', 'spain' => 'europe',
+        'portugal' => 'europe', 'netherlands' => 'europe', 'belgium' => 'europe', 'switzerland' => 'europe',
+        'austria' => 'europe', 'sweden' => 'europe', 'norway' => 'europe', 'denmark' => 'europe',
+        'finland' => 'europe', 'ireland' => 'europe', 'poland' => 'europe', 'czech republic' => 'europe',
+        'czechia' => 'europe', 'hungary' => 'europe', 'greece' => 'europe', 'romania' => 'europe',
+        'bulgaria' => 'europe', 'croatia' => 'europe', 'slovakia' => 'europe', 'slovenia' => 'europe',
+        'lithuania' => 'europe', 'latvia' => 'europe', 'estonia' => 'europe', 'luxembourg' => 'europe',
+        'malta' => 'europe', 'cyprus' => 'europe', 'iceland' => 'europe', 'turkey' => 'europe',
+        'ukraine' => 'europe', 'russia' => 'europe', 'serbia' => 'europe', 'bosnia' => 'europe',
+        'albania' => 'europe', 'moldova' => 'europe', 'macedonia' => 'europe', 'belarus' => 'europe',
+
+        // North America
+        'united states' => 'north_america', 'usa' => 'north_america', 'us' => 'north_america',
+        'canada' => 'north_america', 'mexico' => 'north_america',
+
+        // South America
+        'brazil' => 'south_america', 'argentina' => 'south_america', 'chile' => 'south_america',
+        'colombia' => 'south_america', 'peru' => 'south_america', 'ecuador' => 'south_america',
+        'venezuela' => 'south_america', 'uruguay' => 'south_america', 'paraguay' => 'south_america',
+        'bolivia' => 'south_america',
+
+        // Asia
+        'japan' => 'asia', 'china' => 'asia', 'south korea' => 'asia', 'korea' => 'asia',
+        'india' => 'asia', 'thailand' => 'asia', 'vietnam' => 'asia', 'philippines' => 'asia',
+        'malaysia' => 'asia', 'indonesia' => 'asia', 'singapore' => 'asia', 'taiwan' => 'asia',
+        'hong kong' => 'asia', 'pakistan' => 'asia', 'bangladesh' => 'asia', 'nepal' => 'asia',
+        'sri lanka' => 'asia', 'israel' => 'asia', 'united arab emirates' => 'asia', 'uae' => 'asia',
+        'saudi arabia' => 'asia',
+
+        // Africa
+        'south africa' => 'africa', 'nigeria' => 'africa', 'kenya' => 'africa', 'egypt' => 'africa',
+        'ghana' => 'africa', 'morocco' => 'africa', 'tunisia' => 'africa', 'algeria' => 'africa',
+        'senegal' => 'africa', 'uganda' => 'africa', 'ethiopia' => 'africa', 'tanzania' => 'africa',
+
+        // Oceania
+        'australia' => 'oceania', 'new zealand' => 'oceania',
+    ];
+
+    public function pair($db, $cycleId): bool {
+        $stmt = $db->prepare("
+            SELECT cp.user_id, u.country
+            FROM cycle_participations cp
+            JOIN users u ON cp.user_id = u.id
+            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1
+        ");
+        $stmt->execute([$cycleId]);
+        $participants = $stmt->fetchAll();
+
+        if (count($participants) < 2) {
+            return false;
+        }
+
+        $bestPairs = null;
+        $bestScore = -1;
+        $totalParticipants = count($participants);
+        $maxPossibleScore = (int)($totalParticipants / 2) * 3;
+
+        for ($iteration = 0; $iteration < 50; $iteration++) {
+            shuffle($participants);
+
+            $remaining = $participants;
+            $pairs = [];
+            $score = 0;
+
+            while (count($remaining) >= 2) {
+                $p1 = array_shift($remaining);
+
+                $bestMatchIdx = -1;
+                $bestMatchScore = -1;
+
+                foreach ($remaining as $idx => $p2) {
+                    $s = $this->pairScore($p1['country'], $p2['country']);
+                    if ($s > $bestMatchScore) {
+                        $bestMatchScore = $s;
+                        $bestMatchIdx = $idx;
+                    }
+                }
+
+                $p2 = array_splice($remaining, $bestMatchIdx, 1)[0];
+                $pairs[] = [$p1['user_id'], $p2['user_id']];
+                $score += $bestMatchScore;
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestPairs = $pairs;
+            }
+
+            // All pairs are same-country — no need to keep iterating
+            if ($score === $maxPossibleScore) {
+                break;
+            }
+        }
+
+        // Fallback to random when no geographic proximity was achievable
+        if ($bestScore <= 0) {
+            $randomAlgo = new RandomAlgorithm();
+            return $randomAlgo->pair($db, $cycleId);
+        }
+
+        // Save the best pairing found
+        foreach ($bestPairs as $pair) {
+            [$user1, $user2] = $pair;
+            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
+            $stmt->execute([$user2, $cycleId, $user1]);
+            $stmt->execute([$user1, $cycleId, $user2]);
+        }
+
+        $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
+        $stmt->execute([$cycleId]);
+
+        return true;
+    }
+
+    private function pairScore(string $country1, string $country2): int {
+        if (strcasecmp($country1, $country2) === 0) {
+            return 3;
+        }
+
+        $region1 = $this->getRegion($country1);
+        $region2 = $this->getRegion($country2);
+
+        if ($region1 !== null && $region2 !== null && $region1 === $region2) {
+            return 2;
+        }
+
+        return 0;
+    }
+
+    private function getRegion(string $country): ?string {
+        return self::$regionMap[strtolower(trim($country))] ?? null;
+    }
+}
+
+/**
  * Pairing Algorithm Factory
  */
 class PairingAlgorithmFactory {
@@ -320,6 +464,7 @@ class PairingAlgorithmFactory {
         'sequential' => SequentialAlgorithm::class,
         'zine_type' => ZineTypeAlgorithm::class,
         'country_zine_type' => CountryZineTypeAlgorithm::class,
+        'geographic_proximity' => GeographicProximityAlgorithm::class,
     ];
     
     /**

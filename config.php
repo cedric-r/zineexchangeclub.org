@@ -20,7 +20,7 @@ define('CONTENT_TYPE', 'zine'); // Type of content exchanged: 'zine' or 'postcar
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
 
 // Pairing algorithm configuration
-define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity'
 
 // Captcha configuration
 define('CAPTCHA_MAX_RETRIES', 3);

@@ -210,10 +210,16 @@ The system features a plugin-based pairing system with multiple algorithms:
    - Falls back through: Same country → Same format → Random
    - Most specific matching algorithm
 
+6. **Geographic Proximity**
+   - Prioritizes pairing within the same country
+   - Falls back to same-region pairing (continent-level proximity)
+   - Runs up to 50 randomized iterations to find the best configuration
+   - Falls back to random when no geographic pairings are possible
+
 #### Configuration:
 Set the desired algorithm in `config.php`:
 ```php
-define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type'
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity'
 ```
 
 #### Adding New Algorithms:
