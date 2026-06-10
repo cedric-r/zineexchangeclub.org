@@ -131,6 +131,34 @@ The `.htaccess` file includes:
 - Compression enabled
 - Upload size limits
 
+## Testing
+
+The test suite uses plain PHP CLI scripts — no PHPUnit required. Each test script outputs `[PASS]` or `[FAIL]` lines; a run is green when every line is `[PASS]`.
+
+### Requirements
+
+- PHP 7.4+ (CLI)
+- No database or SMTP server needed — tests use SQLite in-memory
+
+### Running Tests
+
+```bash
+# Full suite
+for f in tests/*.php; do php "$f"; done
+
+# Individual test file
+php tests/AuthTest.php
+php tests/CaptchaTest.php
+```
+
+### Test Architecture
+
+- `tests/bootstrap.php` creates a temporary SQLite-based `config.php` in the project root (config.php is in `.gitignore`, so this is safe) and provides assertion helpers (`assert_equal`, `assert_true`, `assert_throws`).
+- Database-dependent tests use an in-memory SQLite database with the full schema created by `createTestSchema()`.
+- Session-dependent tests manipulate `$_SESSION` directly.
+- Pairing algorithm tests verify two-way symmetric pairings, edge cases (0/1 participants, unconfirmed users), and algorithm-specific behaviour (same-country pairing, sequential ordering, etc.).
+- Email template tests assert HTML content, variable interpolation, and XSS escaping without sending emails.
+
 ## Directory Structure
 
 ```
@@ -150,6 +178,13 @@ zineexchangeclub.org/
 │   ├── reminder-posting.php  # Reminder for posting zines
 │   └── reminder-receiving.php # Reminder for receiving zines
 ├── uploads/                  # Gallery images (create this directory)
+├── tests/                    # Test suite (plain PHP CLI scripts)
+│   ├── bootstrap.php         # Shared test infrastructure + SQLite helper
+│   ├── AuthTest.php          # Authentication function tests
+│   ├── CaptchaTest.php       # Captcha verification tests
+│   ├── EmailTemplatesTest.php # Email template rendering tests
+│   ├── FunctionsTest.php     # Announcement/pairing function tests
+│   └── PairingAlgorithmsTest.php # All 6 pairing algorithm tests
 ├── .htaccess                 # Apache configuration
 ├── captcha.json              # Captcha question/answer pairs
 ├── captcha.php               # Captcha JSON API endpoint
