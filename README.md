@@ -362,7 +362,9 @@ Update SMTP settings in `config.php` to match your mail server.
 
 ## License
 
-This project is provided as-is for the Zine Exchange Club.
+This project is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+
+See the [LICENSE](LICENSE) file for the full license text.
 
 ## Support
 
