@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zine Exchange Club Architecture Diagram</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: #020617;
+      min-height: 100vh;
+      padding: 2rem;
+      color: white;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .header { margin-bottom: 2rem; }
+    .header-row {
+      display: flex; align-items: center; gap: 1rem; margin-bottom: 0.5rem;
+    }
+    .pulse-dot {
+      width: 12px; height: 12px; background: #22d3ee;
+      border-radius: 50%; animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.025em; }
+    .subtitle {
+      color: #94a3b8; font-size: 0.875rem; margin-left: 1.75rem;
+    }
+    .diagram-container {
+      background: rgba(15, 23, 42, 0.5); border-radius: 1rem;
+      border: 1px solid #1e293b; padding: 1.5rem; overflow-x: auto;
+    }
+    svg { width: 100%; min-width: 900px; display: block; }
+    .cards {
+      display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1rem; margin-top: 2rem;
+    }
+    .card {
+      background: rgba(15, 23, 42, 0.5); border-radius: 0.75rem;
+      border: 1px solid #1e293b; padding: 1.25rem;
+    }
+    .card-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+    .card-dot { width: 8px; height: 8px; border-radius: 50%; }
+    .card-dot.cyan { background: #22d3ee; }
+    .card-dot.emerald { background: #34d399; }
+    .card-dot.violet { background: #a78bfa; }
+    .card-dot.amber { background: #fbbf24; }
+    .card-dot.rose { background: #fb7185; }
+    .card h3 { font-size: 0.875rem; font-weight: 600; }
+    .card ul { list-style: none; color: #94a3b8; font-size: 0.75rem; }
+    .card li { margin-bottom: 0.375rem; }
+    .footer {
+      text-align: center; margin-top: 1.5rem;
+      color: #475569; font-size: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="header-row">
+        <div class="pulse-dot"></div>
+        <h1>Zine Exchange Club Architecture</h1>
+      </div>
+      <p class="subtitle">Vanilla PHP zine exchange coordination platform</p>
+    </div>
+
+    <div class="diagram-container">
+      <svg viewBox="0 0 1000 920">
+        <defs>
+          <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#64748b" />
+          </marker>
+          <marker id="arrowhead-emerald" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#34d399" />
+          </marker>
+          <marker id="arrowhead-cyan" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#22d3ee" />
+          </marker>
+          <marker id="arrowhead-violet" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#a78bfa" />
+          </marker>
+          <marker id="arrowhead-rose" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb7185" />
+          </marker>
+          <marker id="arrowhead-orange" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#fb923c" />
+          </marker>
+          <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+            <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e293b" stroke-width="0.5"/>
+          </pattern>
+        </defs>
+
+        <rect width="100%" height="100%" fill="url(#grid)" />
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 1: EXTERNAL USERS                                      -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <!-- Users box -->
+        <rect x="50" y="40" width="130" height="65" rx="8" fill="rgba(30, 41, 59, 0.5)" stroke="#94a3b8" stroke-width="1.5"/>
+        <text x="115" y="68" fill="white" font-size="12" font-weight="600" text-anchor="middle">Users</text>
+        <text x="115" y="88" fill="#94a3b8" font-size="9" text-anchor="middle">Browser / Mobile</text>
+
+        <!-- HTTPS arrow to web server -->
+        <line x1="180" y1="72" x2="228" y2="72" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+        <text x="204" y="66" fill="#94a3b8" font-size="8" text-anchor="middle">HTTPS</text>
+
+        <!-- Web Server -->
+        <rect x="230" y="40" width="130" height="65" rx="8" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1.5"/>
+        <text x="295" y="65" fill="white" font-size="11" font-weight="600" text-anchor="middle">Web Server</text>
+        <text x="295" y="82" fill="#94a3b8" font-size="9" text-anchor="middle">Apache + mod_php</text>
+        <text x="295" y="96" fill="#fbbf24" font-size="7" text-anchor="middle">.htaccess security</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 2: SECURITY                                            -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <!-- Arrow from web server to security layer -->
+        <line x1="295" y1="105" x2="295" y2="132" stroke="#64748b" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+
+        <!-- Security Group boundary -->
+        <rect x="50" y="135" width="310" height="80" rx="8" fill="transparent" stroke="#fb7185" stroke-width="1" stroke-dasharray="4,4"/>
+        <text x="58" y="149" fill="#fb7185" font-size="9" font-weight="600">Security Layer</text>
+
+        <rect x="65" y="155" width="90" height="48" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="110" y="176" fill="white" font-size="10" font-weight="600" text-anchor="middle">Sessions &amp;</text>
+        <text x="110" y="193" fill="#fb7185" font-size="9" text-anchor="middle">CSRF Tokens</text>
+
+        <rect x="165" y="155" width="90" height="48" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="210" y="176" fill="white" font-size="10" font-weight="600" text-anchor="middle">CAPTCHA</text>
+        <text x="210" y="193" fill="#fb7185" font-size="9" text-anchor="middle">Q&amp;A Verification</text>
+
+        <rect x="265" y="155" width="85" height="48" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="307" y="176" fill="white" font-size="10" font-weight="600" text-anchor="middle">Rate Limit</text>
+        <text x="307" y="193" fill="#fb7185" font-size="9" text-anchor="middle">Login/Reset</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 3: PHP APPLICATION — PUBLIC PAGES                       -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <line x1="110" y1="215" x2="110" y2="240" stroke="#22d3ee" stroke-width="1.5" marker-end="url(#arrowhead-cyan)"/>
+
+        <!-- Public Pages boundary -->
+        <rect x="50" y="245" width="460" height="195" rx="8" fill="rgba(8, 51, 68, 0.15)" stroke="#22d3ee" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="58" y="261" fill="#22d3ee" font-size="10" font-weight="600">Public Pages</text>
+
+        <!-- Row 1 of pages -->
+        <rect x="65" y="268" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="115" y="292" fill="white" font-size="10" font-weight="600" text-anchor="middle">index.php</text>
+        <text x="115" y="304" fill="#94a3b8" font-size="7" text-anchor="middle">Home / Cycle Info</text>
+
+        <rect x="175" y="268" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="225" y="292" fill="white" font-size="10" font-weight="600" text-anchor="middle">register.php</text>
+        <text x="225" y="304" fill="#94a3b8" font-size="7" text-anchor="middle">Sign Up + CAPTCHA</text>
+
+        <rect x="285" y="268" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="335" y="292" fill="white" font-size="10" font-weight="600" text-anchor="middle">login.php</text>
+        <text x="335" y="304" fill="#94a3b8" font-size="7" text-anchor="middle">Auth + Rate Limit</text>
+
+        <rect x="395" y="268" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="445" y="292" fill="white" font-size="10" font-weight="600" text-anchor="middle">profile.php</text>
+        <text x="445" y="304" fill="#94a3b8" font-size="7" text-anchor="middle">Zine Details</text>
+
+        <!-- Row 2 of pages -->
+        <rect x="65" y="318" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="115" y="342" fill="white" font-size="10" font-weight="600" text-anchor="middle">process.php</text>
+        <text x="115" y="354" fill="#94a3b8" font-size="7" text-anchor="middle">Join / Confirm / Send / Receive</text>
+
+        <rect x="175" y="318" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="225" y="342" fill="white" font-size="10" font-weight="600" text-anchor="middle">announcements.php</text>
+        <text x="225" y="354" fill="#94a3b8" font-size="7" text-anchor="middle">Read + Track</text>
+
+        <rect x="285" y="318" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="335" y="342" fill="white" font-size="10" font-weight="600" text-anchor="middle">gallery.php</text>
+        <text x="335" y="354" fill="#94a3b8" font-size="7" text-anchor="middle">Zine Photo Gallery</text>
+
+        <rect x="395" y="318" width="100" height="40" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="445" y="342" fill="white" font-size="10" font-weight="600" text-anchor="middle">confirm-*.php</text>
+        <text x="445" y="354" fill="#94a3b8" font-size="7" text-anchor="middle">Email / Pairing / Participation</text>
+
+        <!-- Row 3: password pages -->
+        <rect x="65" y="368" width="160" height="34" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="145" y="390" fill="white" font-size="9" font-weight="600" text-anchor="middle">forgot-password.php / reset-password.php</text>
+
+        <rect x="235" y="368" width="160" height="34" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="315" y="390" fill="white" font-size="9" font-weight="600" text-anchor="middle">captcha.php (JSON endpoint)</text>
+
+        <rect x="405" y="368" width="95" height="34" rx="6" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1.2"/>
+        <text x="453" y="390" fill="white" font-size="9" font-weight="600" text-anchor="middle">logout.php</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 3b: PHP APPLICATION — ADMIN PAGES                        -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <line x1="307" y1="215" x2="307" y2="240" stroke="#fb7185" stroke-width="1.5" marker-end="url(#arrowhead-rose)"/>
+
+        <rect x="540" y="245" width="420" height="195" rx="8" fill="rgba(136, 19, 55, 0.12)" stroke="#fb7185" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="548" y="261" fill="#fb7185" font-size="10" font-weight="600">Admin Dashboard (requireAdmin)</text>
+
+        <rect x="560" y="270" width="170" height="55" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="645" y="293" fill="white" font-size="10" font-weight="600" text-anchor="middle">admin/index.php</text>
+        <text x="645" y="310" fill="#fb7185" font-size="8" text-anchor="middle">Create Cycles • Pair Participants</text>
+        <text x="645" y="322" fill="#fb7185" font-size="8" text-anchor="middle">Manage Users • Send Announcements</text>
+
+        <rect x="755" y="270" width="190" height="55" rx="6" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1.5"/>
+        <text x="850" y="290" fill="white" font-size="10" font-weight="600" text-anchor="middle">admin/gallery.php</text>
+        <text x="850" y="307" fill="#fb7185" font-size="8" text-anchor="middle">Approve / Remove Gallery Items</text>
+        <text x="850" y="322" fill="#fb7185" font-size="8" text-anchor="middle">Manage Submissions</text>
+
+        <!-- Admin actions list -->
+        <text x="575" y="355" fill="#94a3b8" font-size="8">• Create/manage exchange cycles</text>
+        <text x="575" y="370" fill="#94a3b8" font-size="8">• Run pairing (6 algorithms)</text>
+        <text x="575" y="385" fill="#94a3b8" font-size="8">• View email logs &amp; participation status</text>
+        <text x="575" y="400" fill="#94a3b8" font-size="8">• Bulk send announcements via email</text>
+        <text x="575" y="415" fill="#94a3b8" font-size="8">• Manage gallery (approve/reject)</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 4: CORE LIBRARY (includes/)                              -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <!-- Arrows from pages down to core -->
+        <path d="M 115 440 L 115 460" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+        <path d="M 645 440 L 645 460" fill="none" stroke="#34d399" stroke-width="1.5" marker-end="url(#arrowhead-emerald)"/>
+
+        <!-- Core Library boundary -->
+        <rect x="50" y="465" width="910" height="130" rx="8" fill="rgba(6, 78, 59, 0.12)" stroke="#34d399" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="58" y="481" fill="#34d399" font-size="10" font-weight="600">Core Library (includes/)</text>
+
+        <!-- includes/auth.php -->
+        <rect x="65" y="490" width="130" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="130" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">auth.php</text>
+        <text x="130" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">Session Auth • Login/Logout</text>
+
+        <!-- includes/email.php -->
+        <rect x="210" y="490" width="130" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="275" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">email.php</text>
+        <text x="275" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">SMTP via fsockopen</text>
+
+        <!-- includes/functions.php -->
+        <rect x="355" y="490" width="130" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="420" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">functions.php</text>
+        <text x="420" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">Tokens • Notifications</text>
+
+        <!-- includes/captcha.php -->
+        <rect x="500" y="490" width="130" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="565" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">captcha.php</text>
+        <text x="565" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">Q&amp;A Verify • Retry Limit</text>
+
+        <!-- includes/pairing_algorithms.php -->
+        <rect x="645" y="490" width="170" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="730" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">pairing_algorithms.php</text>
+        <text x="730" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">6 Algorithms • Plugin Interface</text>
+
+        <!-- Template partials -->
+        <rect x="830" y="490" width="115" height="50" rx="6" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1.5"/>
+        <text x="888" y="511" fill="white" font-size="10" font-weight="600" text-anchor="middle">header/footer</text>
+        <text x="888" y="528" fill="#94a3b8" font-size="8" text-anchor="middle">Layout Partials</text>
+
+        <!-- Label for the core page connection -->
+        <text x="115" y="450" fill="#94a3b8" font-size="8" text-anchor="middle">require_once</text>
+        <text x="645" y="450" fill="#94a3b8" font-size="8" text-anchor="middle">require_once</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 5: EMAIL TEMPLATES + CLI/CRON                           -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <!-- Arrow from email.php to email templates -->
+        <line x1="275" y1="540" x2="275" y2="565" stroke="#fb923c" stroke-width="1.5" marker-end="url(#arrowhead-orange)"/>
+
+        <rect x="50" y="610" width="460" height="95" rx="8" fill="rgba(251, 146, 60, 0.12)" stroke="#fb923c" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="58" y="626" fill="#fb923c" font-size="10" font-weight="600">Email Templates (emails/)</text>
+
+        <!-- Row 1 -->
+        <rect x="65" y="635" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="117" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">registration.php</text>
+
+        <rect x="180" y="635" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="232" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">cycle_invitation.php</text>
+
+        <rect x="295" y="635" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="347" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">pairing.php</text>
+
+        <rect x="410" y="635" width="88" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="454" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">zine_posted.php</text>
+
+        <!-- Row 2 -->
+        <rect x="65" y="669" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="117" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">reminder.php</text>
+
+        <rect x="180" y="669" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="232" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">participation_reminder.php</text>
+
+        <rect x="295" y="669" width="105" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="347" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">announcement.php</text>
+
+        <rect x="410" y="669" width="88" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="454" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">password_reset.php</text>
+
+        <!-- CLI/Cron section -->
+        <rect x="540" y="610" width="420" height="95" rx="8" fill="rgba(251, 146, 60, 0.12)" stroke="#fb923c" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="548" y="626" fill="#fb923c" font-size="10" font-weight="600">CLI / Cron Scripts (scripts/)</text>
+
+        <rect x="555" y="635" width="190" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="650" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">reminder-posting.php (daily 9AM)</text>
+
+        <rect x="755" y="635" width="195" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="853" y="653" fill="#94a3b8" font-size="8" text-anchor="middle">reminder-receiving.php (daily 10AM)</text>
+
+        <rect x="555" y="669" width="190" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="650" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">update_participations.php</text>
+
+        <rect x="755" y="669" width="195" height="28" rx="4" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="853" y="687" fill="#94a3b8" font-size="8" text-anchor="middle">crontab-example.txt</text>
+
+        <!-- Arrows from email+cli down to database -->
+        <path d="M 275 600 L 275 725" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+        <path d="M 700 600 L 700 725" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+        <text x="275" y="710" fill="#94a3b8" font-size="8" text-anchor="middle">email_logs</text>
+        <text x="700" y="710" fill="#94a3b8" font-size="8" text-anchor="middle">read/write</text>
+
+        <!-- Arrows from core library down to database -->
+        <path d="M 420 540 L 420 725" fill="none" stroke="#a78bfa" stroke-width="1.5" marker-end="url(#arrowhead-violet)"/>
+        <line x1="420" y1="540" x2="420" y2="610" stroke="#a78bfa" stroke-width="1.5"/>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LAYER 6: DATABASE                                             -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <rect x="50" y="730" width="910" height="120" rx="8" fill="rgba(76, 29, 149, 0.12)" stroke="#a78bfa" stroke-width="1" stroke-dasharray="6,3"/>
+        <text x="58" y="746" fill="#a78bfa" font-size="10" font-weight="600">Database (MySQL / MariaDB)</text>
+
+        <!-- Row 1 -->
+        <rect x="65" y="755" width="108" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="119" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">users</text>
+        <text x="119" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Auth • Profile</text>
+
+        <rect x="185" y="755" width="108" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="239" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">zines</text>
+        <text x="239" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Theme • Format</text>
+
+        <rect x="305" y="755" width="108" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="359" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">cycles</text>
+        <text x="359" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Dates • Status</text>
+
+        <rect x="425" y="755" width="108" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="479" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">cycle_participations</text>
+        <text x="479" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Join • Pair • Track</text>
+
+        <rect x="545" y="755" width="108" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="599" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">gallery</text>
+        <text x="599" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Images • Captions</text>
+
+        <rect x="665" y="755" width="118" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="724" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">email_logs</text>
+        <text x="724" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Audit Trail</text>
+
+        <rect x="795" y="755" width="150" height="40" rx="6" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1.2"/>
+        <text x="870" y="775" fill="white" font-size="9" font-weight="600" text-anchor="middle">announcements + views</text>
+        <text x="870" y="789" fill="#94a3b8" font-size="7" text-anchor="middle">Content • Read Tracking</text>
+
+        <!-- Key relationship arrows -->
+        <path d="M 119 795 L 119 810 L 359 810 L 359 795" fill="none" stroke="#a78bfa" stroke-width="0.8" marker-end="url(#arrowhead-violet)"/>
+        <path d="M 239 795 L 239 810 L 479 810 L 479 795" fill="none" stroke="#a78bfa" stroke-width="0.8" marker-end="url(#arrowhead-violet)"/>
+        <text x="300" y="820" fill="#6b21a8" font-size="6" text-anchor="middle">FOREIGN KEY relationships</text>
+
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+        <!-- LEGEND                                                        -->
+        <!-- ═══════════════════════════════════════════════════════════════ -->
+
+        <text x="50" y="855" fill="white" font-size="10" font-weight="600">Legend</text>
+
+        <rect x="50" y="862" width="14" height="10" rx="2" fill="rgba(8, 51, 68, 0.4)" stroke="#22d3ee" stroke-width="1"/>
+        <text x="69" y="870" fill="#94a3b8" font-size="8">Frontend / Public Pages</text>
+
+        <rect x="230" y="862" width="14" height="10" rx="2" fill="rgba(136, 19, 55, 0.4)" stroke="#fb7185" stroke-width="1"/>
+        <text x="249" y="870" fill="#94a3b8" font-size="8">Admin / Security</text>
+
+        <rect x="390" y="862" width="14" height="10" rx="2" fill="rgba(6, 78, 59, 0.4)" stroke="#34d399" stroke-width="1"/>
+        <text x="409" y="870" fill="#94a3b8" font-size="8">Core Library</text>
+
+        <rect x="540" y="862" width="14" height="10" rx="2" fill="rgba(251, 146, 60, 0.25)" stroke="#fb923c" stroke-width="1"/>
+        <text x="559" y="870" fill="#94a3b8" font-size="8">Email / Cron</text>
+
+        <rect x="680" y="862" width="14" height="10" rx="2" fill="rgba(76, 29, 149, 0.4)" stroke="#a78bfa" stroke-width="1"/>
+        <text x="699" y="870" fill="#94a3b8" font-size="8">Database</text>
+
+        <rect x="810" y="862" width="14" height="10" rx="2" fill="rgba(120, 53, 15, 0.3)" stroke="#fbbf24" stroke-width="1"/>
+        <text x="829" y="870" fill="#94a3b8" font-size="8">Infrastructure</text>
+
+      </svg>
+    </div>
+
+    <!-- Info Cards -->
+    <div class="cards">
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot cyan"></div>
+          <h3>Tech Stack</h3>
+        </div>
+        <ul>
+          <li>• Vanilla PHP 8.3+ (no framework)</li>
+          <li>• Apache + mod_php</li>
+          <li>• MySQL / MariaDB</li>
+          <li>• SMTP relay (no auth)</li>
+          <li>• CSS + vanilla JS frontend</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot emerald"></div>
+          <h3>Exchange Flow</h3>
+        </div>
+        <ul>
+          <li>• Register → Confirm email</li>
+          <li>• Join cycle → Confirm participation</li>
+          <li>• Admin pairs → Confirm pairing</li>
+          <li>• Send zine → Receive zine</li>
+          <li>• Upload to gallery</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-dot violet"></div>
+          <h3>Key Features</h3>
+        </div>
+        <ul>
+          <li>• 6 plugin-based pairing algorithms</li>
+          <li>• Question-based CAPTCHA</li>
+          <li>• Cron-driven reminder emails</li>
+          <li>• Email notification audit trail</li>
+          <li>• SQLite in-memory test suite</li>
+        </ul>
+      </div>
+    </div>
+
+    <p class="footer">
+      Zine Exchange Club • Vanilla PHP • MySQL • Apache
+    </p>
+  </div>
+</body>
+</html>

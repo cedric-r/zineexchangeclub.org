@@ -16,6 +16,25 @@ A zine exchange coordination system built in vanilla PHP. This platform allows z
 - **Mobile Responsive**: Airy, modern design that works on all devices
 - **Bot Protection**: Question-based captcha on registration, login, and password reset forms with configurable retry limit
 
+## Architecture
+
+![Zine Exchange Club Architecture](zine-exchange-club-architecture.png)
+
+*An interactive HTML version is available at
+[`zine-exchange-club-architecture.html`](zine-exchange-club-architecture.html) —
+open it in a browser for the full detail.*
+
+The system follows a classic LAMP-stack architecture:
+
+- **Web Layer**: Apache with `.htaccess` security headers, file protections, and URL rewriting
+- **Security Layer**: PHP sessions with CSRF tokens, question-based CAPTCHA, and rate limiting on login/reset forms
+- **Public Pages**: User-facing PHP pages for registration, login, cycle participation, exchange tracking, gallery, and announcements
+- **Admin Dashboard**: Admin-only pages for cycle management, participant pairing (6 plugin-based algorithms), announcement broadcasting, and gallery moderation
+- **Core Library**: Shared PHP includes for authentication (`auth.php`), SMTP email (`email.php` via `fsockopen`), pairing algorithms (`pairing_algorithms.php`), CAPTCHA verification, and utility functions
+- **Background Services**: Cron-driven CLI scripts for posting/receiving reminders and batch updates
+- **Email Templates**: HTML email templates for every stage of the exchange cycle
+- **Database**: MySQL/MariaDB with 7 tables (`users`, `zines`, `cycles`, `cycle_participations`, `gallery`, `email_logs`, `announcements` + `announcement_views`)
+
 ## Requirements
 
 - PHP 7.4 or higher
