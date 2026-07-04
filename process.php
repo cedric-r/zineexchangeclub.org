@@ -165,14 +165,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get user's participations
+// Get user's participations (active cycles + closed cycles where user received zine but hasn't uploaded a photo)
 $stmt = $db->prepare("
     SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open,
            u.name as partner_name, u.email as partner_email, u.postal_address as partner_address, u.country as partner_country
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
     LEFT JOIN users u ON cp.paired_with_id = u.id
-    WHERE cp.user_id = ? AND c.status = 'active'
+    WHERE cp.user_id = ?
+      AND (
+          c.status = 'active'
+          OR (c.status = 'closed' AND cp.zine_received = 1
+              AND NOT EXISTS (SELECT 1 FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id))
+      )
     ORDER BY c.start_date DESC
 ");
 $stmt->execute([$userId]);
