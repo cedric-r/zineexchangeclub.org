@@ -37,7 +37,8 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
         // Group by country
         $byCountry = [];
         foreach ($participants as $p) {
-            $byCountry[$p['country']][] = $p['user_id'];
+            $country = GeographicProximityAlgorithm::normalizeCountry($p['country']);
+            $byCountry[$country][] = $p['user_id'];
         }
         
         // Sort countries by participant count (descending)
@@ -291,7 +292,7 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
         // Group by country AND zine format (highest priority)
         $byCountryAndFormat = [];
         foreach ($participants as $p) {
-            $country = $p['country'];
+            $country = GeographicProximityAlgorithm::normalizeCountry($p['country']);
             $format = $p['zine_format'] ?: 'other';
             $key = $country . '|' . $format;
             $byCountryAndFormat[$key][] = $p['user_id'];
@@ -358,6 +359,78 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
  * then falls back to random when no geographic pairings are possible.
  */
 class GeographicProximityAlgorithm implements PairingAlgorithm {
+    public const COUNTRY_ALIASES = [
+        // North America variants
+        'us of a'          => 'united states',
+        'united states of america' => 'united states',
+        'u.s.a.'           => 'united states',
+        'u s a'            => 'united states',
+        'the us'           => 'united states',
+        'america'          => 'united states',
+        'u.s.'             => 'united states',
+
+        // UK variants
+        'great britain'    => 'united kingdom',
+        'britain'          => 'united kingdom',
+        'england'          => 'united kingdom',
+        'scotland'         => 'united kingdom',
+        'wales'            => 'united kingdom',
+        'northern ireland' => 'united kingdom',
+        'the uk'           => 'united kingdom',
+        'u.k.'             => 'united kingdom',
+
+        // European country name variants (native language → English)
+        'danmark'          => 'denmark',
+        'deutschland'      => 'germany',
+        'espana'           => 'spain',        // without tilde for ASCII safety
+        'italia'           => 'italy',
+        'nederland'        => 'netherlands',
+        'holland'          => 'netherlands',
+        'suomi'            => 'finland',
+        'sverige'          => 'sweden',
+        'norge'            => 'norway',
+        'polska'           => 'poland',
+        'oesterreich'      => 'austria',      // oe for ö
+        'osterreich'       => 'austria',
+        'schweiz'          => 'switzerland',
+        'suisse'           => 'switzerland',
+        'svizzera'         => 'switzerland',
+        'ceska republika'  => 'czech republic',
+        'magyarorszag'     => 'hungary',
+        'ellada'           => 'greece',
+        'romania'          => 'romania',
+        'schotland'        => 'netherlands',
+        'belgique'         => 'belgium',
+        'belgie'           => 'belgium',
+
+        // Asia variants
+        'nippon'           => 'japan',
+        'zhongguo'         => 'china',
+        'taiwan'           => 'taiwan',
+        'south korea'      => 'korea',
+        'republic of korea' => 'korea',
+        'daehanminguk'     => 'korea',
+        'u.a.e.'           => 'united arab emirates',
+        'türkiye'          => 'turkey',
+        'turkiye'          => 'turkey',
+
+        // South America variants
+        'brasil'           => 'brazil',
+
+        // North America (additional)
+        'méxico'           => 'mexico',
+        'mexico'           => 'mexico',
+        'canada'           => 'canada',
+
+        // Russia / ex-USSR
+        'rossiya'          => 'russia',
+        'belarus'          => 'belarus',
+
+        // Oceania
+        'down under'       => 'australia',
+        'kiwiland'         => 'new zealand',
+    ];
+
     private static array $regionMap = [
         // Europe
         'united kingdom' => 'europe', 'uk' => 'europe', 'great britain' => 'europe', 'england' => 'europe',
@@ -399,11 +472,21 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         'australia' => 'oceania', 'new zealand' => 'oceania',
     ];
 
+    /**
+     * Normalize a country name to its canonical English form.
+     * Handles common aliases, native-language names, and variations.
+     */
+    public static function normalizeCountry(string $country): string {
+        $lower = strtolower(trim($country));
+        return self::COUNTRY_ALIASES[$lower] ?? $lower;
+    }
+
     public function pair($db, $cycleId): bool {
         $stmt = $db->prepare("
-            SELECT cp.user_id, u.country
+            SELECT cp.user_id, u.country, z.format as zine_format
             FROM cycle_participations cp
             JOIN users u ON cp.user_id = u.id
+            LEFT JOIN zines z ON cp.user_id = z.user_id
             WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1
         ");
         $stmt->execute([$cycleId]);
@@ -417,8 +500,9 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         $bestScore = -1;
         $totalParticipants = count($participants);
         $maxPossibleScore = (int)($totalParticipants / 2) * 3;
+        $maxIterations = max(50, min(500, count($participants) * 10));
 
-        for ($iteration = 0; $iteration < 50; $iteration++) {
+        for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
             shuffle($participants);
 
             $remaining = $participants;
@@ -430,17 +514,19 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
 
                 $bestMatchIdx = -1;
                 $bestMatchScore = -1;
+                $bestMatchP2 = [];
 
                 foreach ($remaining as $idx => $p2) {
                     $s = $this->pairScore($p1['country'], $p2['country']);
-                    if ($s > $bestMatchScore) {
+                    if ($s > $bestMatchScore || ($s === $bestMatchScore && $s > 0 && $this->formatMatch($p1, $p2) && !$this->formatMatch($p1, $bestMatchP2))) {
                         $bestMatchScore = $s;
                         $bestMatchIdx = $idx;
+                        $bestMatchP2 = $p2; // track the best match for format tiebreaking
                     }
                 }
 
                 $p2 = array_splice($remaining, $bestMatchIdx, 1)[0];
-                $pairs[] = [$p1['user_id'], $p2['user_id']];
+                $pairs[] = [$p1['user_id'], $p2['user_id'], $p1['country'], $p2['country']];
                 $score += $bestMatchScore;
             }
 
@@ -455,22 +541,10 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
             }
         }
 
-        // Fallback to random when no geographic proximity was achievable
-        if ($bestScore <= 0) {
-            $randomAlgo = new RandomAlgorithm();
-            // Check for unpaired participant (odd count) before fallback
-            $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
-            $checkStmt->execute([$cycleId]);
-            $unpaired = (int)$checkStmt->fetchColumn();
-            if ($unpaired > 0) {
-                error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
-            }
-            return $randomAlgo->pair($db, $cycleId);
-        }
-
         // Save the best pairing found
         foreach ($bestPairs as $pair) {
-            [$user1, $user2] = $pair;
+            $user1 = $pair[0];
+            $user2 = $pair[1];
             $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
             $stmt->execute([$user2, $cycleId, $user1]);
             $stmt->execute([$user1, $cycleId, $user2]);
@@ -478,6 +552,22 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
 
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
+
+        // Log pairing quality stats
+        $sameCountry = 0; $sameRegion = 0; $crossRegion = 0;
+        foreach ($bestPairs as $pair) {
+            $c1 = $pair[2] ?? '';
+            $c2 = $pair[3] ?? '';
+            $ps = $this->pairScore($c1, $c2);
+            if ($ps === 3) {
+                $sameCountry++;
+            } elseif ($ps === 2) {
+                $sameRegion++;
+            } else {
+                $crossRegion++;
+            }
+        }
+        error_log("[GeographicProximityAlgorithm] Cycle {$cycleId}: {$sameCountry} same-country, {$sameRegion} same-region, {$crossRegion} cross-region pairs");
         
         // Check for unpaired participant (odd count)
         $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
@@ -490,13 +580,22 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         return true;
     }
 
+    private function formatMatch(array $p1, array $p2): bool {
+        $f1 = ($p1['zine_format'] ?? '') ?: '';
+        $f2 = ($p2['zine_format'] ?? '') ?: '';
+        return $f1 !== '' && $f2 !== '' && strcasecmp($f1, $f2) === 0;
+    }
+
     private function pairScore(string $country1, string $country2): int {
-        if (strcasecmp($country1, $country2) === 0) {
+        $c1 = self::normalizeCountry($country1);
+        $c2 = self::normalizeCountry($country2);
+
+        if (strcasecmp($c1, $c2) === 0) {
             return 3;
         }
 
-        $region1 = $this->getRegion($country1);
-        $region2 = $this->getRegion($country2);
+        $region1 = $this->getRegion($c1);
+        $region2 = $this->getRegion($c2);
 
         if ($region1 !== null && $region2 !== null && $region1 === $region2) {
             return 2;
@@ -506,7 +605,7 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
     }
 
     private function getRegion(string $country): ?string {
-        return self::$regionMap[strtolower(trim($country))] ?? null;
+        return self::$regionMap[self::normalizeCountry($country)] ?? null;
     }
 }
 

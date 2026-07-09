@@ -334,6 +334,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     }
+
+    if (isset($_POST['manual_pair'])) {
+        $cycleId = (int)$_POST['cycle_id'];
+        $user1 = (int)$_POST['user_1'];
+        $user2 = (int)$_POST['user_2'];
+        
+        if ($user1 > 0 && $user2 > 0 && $user1 !== $user2) {
+            try {
+                $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$user2, $cycleId, $user1]);
+                $stmt->execute([$user1, $cycleId, $user2]);
+                $message = 'Manual pairing completed successfully!';
+                $messageType = 'success';
+            } catch (Exception $e) {
+                error_log('Manual pairing failed: ' . $e->getMessage());
+                $message = 'Manual pairing failed.';
+                $messageType = 'error';
+            }
+        } else {
+            $message = 'Please select two different users.';
+            $messageType = 'error';
+        }
+    }
 }
 
 // Get all cycles
@@ -499,6 +522,51 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="resend_pairing_emails" class="btn-small">Resend Pairing Emails</button>
                                         </form>
+                                        <?php endif; ?>
+                                        
+                                        <?php if ($cycle['pairing_done']): ?>
+                                        <?php
+                                        // Get unpaired participants for manual pairing
+                                        $unpairedStmt = $db->prepare("
+                                            SELECT cp.user_id, u.name, u.email, u.country
+                                            FROM cycle_participations cp
+                                            JOIN users u ON cp.user_id = u.id
+                                            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 
+                                              AND cp.wants_to_participate = 1 AND cp.paired_with_id IS NULL
+                                            ORDER BY u.name
+                                        ");
+                                        $unpairedStmt->execute([$cycle['id']]);
+                                        $unpairedUsers = $unpairedStmt->fetchAll();
+                                        ?>
+                                        <?php if (count($unpairedUsers) >= 2): ?>
+                                        <form method="post" class="inline-form manual-pair-form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                            <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
+                                            <select name="user_1" required>
+                                                <option value="">-- Select user 1 --</option>
+                                                <?php foreach ($unpairedUsers as $u): ?>
+                                                    <option value="<?php echo $u['user_id']; ?>">
+                                                        <?php echo htmlspecialchars($u['name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                        (<?php echo htmlspecialchars($u['country'], ENT_QUOTES, 'UTF-8'); ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <span style="margin:0 4px;">↔</span>
+                                            <select name="user_2" required>
+                                                <option value="">-- Select user 2 --</option>
+                                                <?php foreach ($unpairedUsers as $u): ?>
+                                                    <option value="<?php echo $u['user_id']; ?>">
+                                                        <?php echo htmlspecialchars($u['name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                        (<?php echo htmlspecialchars($u['country'], ENT_QUOTES, 'UTF-8'); ?>)
+                                                    </option>
+                                                <?php endforeach; ?>
+                                            </select>
+                                            <button type="submit" name="manual_pair" class="btn-small">Manual Pair</button>
+                                        </form>
+                                        <?php elseif (count($unpairedUsers) === 1): ?>
+                                        <span class="status pending">1 unpaired — need at least 2 for manual pairing</span>
+                                        <?php endif; ?>
                                         <?php endif; ?>
                                         
                                         <form method="post" class="inline-form">
