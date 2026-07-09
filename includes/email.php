@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 // Email sending utility using SMTP without authentication
 
 require_once __DIR__ . '/../config.php';
@@ -68,6 +69,9 @@ function sendEmail($to, $subject, $body, $html = true) {
         return false;
     }
 
+    // Dot-stuff the body to prevent SMTP injection
+    $body = preg_replace('/^\./m', '..', $body);
+
     // Send headers and body
     fwrite($smtp, $headers . "\r\n");
     fwrite($smtp, $body . "\r\n.\r\n");
@@ -92,7 +96,9 @@ function logEmail($userId, $cycleId, $emailType) {
 }
 
 function renderEmailTemplate($template, $vars = []) {
-    extract($vars);
+    foreach ($vars as $key => $value) {
+        $$key = $value;
+    }
     ob_start();
     include __DIR__ . '/../emails/' . $template . '.php';
     return ob_get_clean();

@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
@@ -40,7 +41,8 @@ if ($rateLimited) {
         
         if ($user) {
             if (!$user['email_confirmed']) {
-                $error = 'Please confirm your email address before requesting a password reset.';
+                error_log("Forgot password request for unconfirmed email: {$email}");
+                $success = 'If an account with this email exists, a password reset link has been sent.';
             } else {
                 // Generate reset token
                 $token = generateToken();

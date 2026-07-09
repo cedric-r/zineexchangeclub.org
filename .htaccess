@@ -4,22 +4,20 @@
     Header set X-Frame-Options "SAMEORIGIN"
     Header set X-XSS-Protection "1; mode=block"
     Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self';"
 </IfModule>
 
 # Disable directory browsing
 Options -Indexes
 
 # Protect sensitive files
-<FilesMatch "^(config\.php|schema\.sql|\.htaccess)$">
+<FilesMatch "^(config\.php|schema\.sql|captcha\.json|\.htaccess)$">
     Order allow,deny
     Deny from all
 </FilesMatch>
 
 # Protect includes directory
-<FilesMatch "^includes/">
-    Order allow,deny
-    Deny from all
-</FilesMatch>
+RewriteRule ^includes/ - [F,L]
 
 # Enable compression
 <IfModule mod_deflate.c>
@@ -34,9 +32,12 @@ AddDefaultCharset UTF-8
     RewriteEngine On
     
     # Redirect HTTP to HTTPS (uncomment on production)
-    # RewriteCond %{HTTPS} off
-    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-    
+    RewriteCond %{HTTPS} off
+    RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Block PHP execution in uploads
+    RewriteRule ^uploads/.*\.php$ - [F,L]
+
     # Remove .php extension (optional)
     # RewriteCond %{REQUEST_FILENAME} !-d
     # RewriteCond %{REQUEST_FILENAME}\.php -f
@@ -49,6 +50,6 @@ php_value post_max_size 5M
 
 # Session security
 php_value session.cookie_httponly 1
-php_value session.cookie_secure 0
+php_value session.cookie_secure 1
 php_value session.use_only_cookies 1
 php_value session.cookie_samesite "Strict"

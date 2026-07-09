@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
@@ -27,11 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (isset($_POST['confirm_participation'])) {
         $cycleId = (int)$_POST['cycle_id'];
-        $token = $_POST['token'] ?? '';
 
-        // Validate token matches the stored confirmation token
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND participation_confirmed = 0 AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
-        $stmt->execute([$cycleId, $userId, $token]);
+        // Look up the confirmation token from the database
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND participation_confirmed = 0 AND confirmation_token IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
+        $stmt->execute([$cycleId, $userId]);
 
         if ($stmt->fetch()) {
             $stmt = $db->prepare("UPDATE cycle_participations SET participation_confirmed = 1, confirmation_token = NULL WHERE cycle_id = ? AND user_id = ?");
@@ -66,18 +66,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             $messageType = 'success';
         } catch (Exception $e) {
-            $message = 'Failed to update participation. Error: ' . $e->getMessage();
+            error_log('Failed to update participation: ' . $e->getMessage());
+            $message = 'Failed to update participation.';
             $messageType = 'error';
         }
     }
     
     if (isset($_POST['confirm_pairing'])) {
         $cycleId = (int)$_POST['cycle_id'];
-        $token = $_POST['token'] ?? '';
 
-        // Validate token matches the stored confirmation token
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND confirmation_token = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
-        $stmt->execute([$cycleId, $userId, $token]);
+        // Look up the confirmation token from the database
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL AND confirmation_token IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
+        $stmt->execute([$cycleId, $userId]);
 
         if ($stmt->fetch()) {
             $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1, confirmation_token = NULL WHERE cycle_id = ? AND user_id = ?");
@@ -137,8 +137,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             finfo_close($finfo);
             
             if (in_array($mime, $allowedTypes)) {
-                $extension = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
-                $filename = uniqid() . '.' . $extension;
+                $extension = match($mime) {
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                    default => 'jpg',
+                };
+                $filename = bin2hex(random_bytes(16)) . '.' . $extension;
                 $uploadPath = 'uploads/' . $filename;
                 
                 if (!is_dir('uploads')) {
@@ -290,7 +296,6 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                             <?php $csrf = generateCsrfToken(); ?>
                                             <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
-                                            <input type="hidden" name="token" value="<?php echo htmlspecialchars($p['confirmation_token']); ?>">
                                             <button type="submit" name="confirm_participation" class="btn-small">Confirm</button>
                                         </form>
                                     <?php endif; ?>
@@ -304,7 +309,6 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                             <?php $csrf = generateCsrfToken(); ?>
                                             <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
-                                            <input type="hidden" name="token" value="<?php echo htmlspecialchars($p['confirmation_token']); ?>">
                                             <button type="submit" name="confirm_pairing" class="btn-small">Confirm</button>
                                         </form>
                                     <?php endif; ?>

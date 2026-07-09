@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Captcha verification using simple question/answer pairs
  */

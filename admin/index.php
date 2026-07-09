@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/email.php';
@@ -167,7 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $message = 'User and all associated data deleted successfully!';
                 $messageType = 'success';
             } catch (Exception $e) {
-                $message = 'Delete failed: ' . $e->getMessage();
+                error_log('Delete user failed: ' . $e->getMessage());
+                $message = 'Delete failed.';
                 $messageType = 'error';
             }
         }
@@ -197,7 +199,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Cycle and all associated data deleted successfully!';
             $messageType = 'success';
         } catch (Exception $e) {
-            $message = 'Delete failed: ' . $e->getMessage();
+            error_log('Delete cycle failed: ' . $e->getMessage());
+            $message = 'Delete failed.';
             $messageType = 'error';
         }
     }
@@ -323,7 +326,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $emailBody = getRegistrationEmail($user['name'], $confirmationToken);
             if (sendEmail($user['email'], 'Confirm Your Email Address', $emailBody)) {
                 logEmail($userId, null, 'email_confirmation');
-                $message = 'Confirmation email has been resent to ' . htmlspecialchars($user['email']) . '.';
+                $message = 'Confirmation email has been resent to ' . htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8') . '.';
                 $messageType = 'success';
             } else {
                 $message = 'Failed to resend confirmation email.';
@@ -385,7 +388,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
             <h1>Admin Dashboard</h1>
             
             <?php if ($message): ?>
-                <div class="message <?php echo $messageType; ?>"><?php echo htmlspecialchars($message); ?></div>
+                <div class="message <?php echo $messageType; ?>"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
             
             <section class="admin-section">
@@ -441,7 +444,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 $receivedCount = $stmt->fetchColumn();
                                 ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($cycle['name']); ?></td>
+                                    <td><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo date('F j, Y', strtotime($cycle['start_date'])); ?></td>
                                     <td>
                                         <?php if ($cycle['registration_open']): ?>
@@ -505,7 +508,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             <button type="submit" name="close_cycle" class="btn-small btn-danger">Close Cycle</button>
                                         </form>
                                         
-                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name']); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
                                         
                                         <form method="post" class="inline-form">
                                                 <?php $csrf = generateCsrfToken(); ?>
@@ -551,7 +554,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 $receivedCount = $stmt->fetchColumn();
                                 ?>
                                 <tr>
-                                    <td><?php echo htmlspecialchars($cycle['name']); ?></td>
+                                    <td><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td><?php echo date('F j, Y', strtotime($cycle['start_date'])); ?></td>
                                     <td>
                                         <?php echo $totalParticipants; ?> total<br>
@@ -564,7 +567,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="reopen_cycle" class="btn-small">Reopen</button>
                                         </form>
-                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name']); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -593,16 +596,16 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                         <tbody>
                             <?php foreach ($users as $user): ?>
                                 <tr id="user-row-<?php echo $user['id']; ?>"
-                                    data-name="<?php echo htmlspecialchars($user['name']); ?>"
-                                    data-email="<?php echo htmlspecialchars($user['email']); ?>"
-                                    data-country="<?php echo htmlspecialchars($user['country']); ?>"
-                                    data-postal-address="<?php echo htmlspecialchars($user['postal_address']); ?>"
+                                    data-name="<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>"
+                                    data-email="<?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?>"
+                                    data-country="<?php echo htmlspecialchars($user['country'], ENT_QUOTES, 'UTF-8'); ?>"
+                                    data-postal-address="<?php echo htmlspecialchars($user['postal_address'], ENT_QUOTES, 'UTF-8'); ?>"
                                     data-accepts-adult-zines="<?php echo $user['accepts_adult_zines']; ?>"
                                     data-is-admin="<?php echo $user['is_admin']; ?>"
                                     data-email-confirmed="<?php echo $user['email_confirmed']; ?>">
-                                    <td><?php echo htmlspecialchars($user['name']); ?></td>
-                                    <td><?php echo htmlspecialchars($user['email']); ?></td>
-                                    <td><?php echo htmlspecialchars($user['country']); ?></td>
+                                    <td><?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                    <td><?php echo htmlspecialchars($user['country'], ENT_QUOTES, 'UTF-8'); ?></td>
                                     <td>
                                         <?php if ($user['email_confirmed']): ?>
                                             <span class="status completed">Yes</span>
@@ -621,9 +624,9 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                     <td>
                                         <button class="btn-small" onclick="editUser(<?php echo $user['id']; ?>)">Edit</button>
                                         <?php if (!$user['email_confirmed']): ?>
-                                            <button class="btn-small" onclick="resendConfirmationEmail(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email']); ?>')">Resend Confirmation</button>
+                                            <button class="btn-small" onclick="resendConfirmationEmail(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?>')">Resend Confirmation</button>
                                         <?php endif; ?>
-                                        <button class="btn-small btn-danger" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name']); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -638,7 +641,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                     <p class="empty-state">No cycles to show.</p>
                 <?php else: ?>
                     <?php foreach ($activeCycles as $cycle): ?>
-                        <h3><?php echo htmlspecialchars($cycle['name']); ?> <span class="status open">(Active)</span></h3>
+                        <h3><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status open">(Active)</span></h3>
                         <?php
                         $stmt = $db->prepare("
                             SELECT cp.*, u.name, u.email, u.country,
@@ -671,8 +674,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 <tbody>
                                     <?php foreach ($participations as $p): ?>
                                         <tr>
-                                            <td><?php echo htmlspecialchars($p['name']); ?></td>
-                                            <td><?php echo htmlspecialchars($p['country']); ?></td>
+                                            <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                            <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td>
                                                 <?php if ($p['wants_to_participate']): ?>
                                                     <span class="status completed">Yes</span>
@@ -689,7 +692,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             </td>
                                             <td>
                                                 <?php if ($p['partner_name']): ?>
-                                                    <?php echo htmlspecialchars($p['partner_name']); ?>
+                                                    <?php echo htmlspecialchars($p['partner_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                 <?php else: ?>
                                                     -
                                                 <?php endif; ?>
@@ -732,7 +735,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                         <details class="collapsed-cycles">
                             <summary>Archived Cycles (<?php echo count($closedCycles); ?>)</summary>
                             <?php foreach ($closedCycles as $cycle): ?>
-                                <h4><?php echo htmlspecialchars($cycle['name']); ?> <span class="status closed">(Archived)</span></h4>
+                                <h4><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status closed">(Archived)</span></h4>
                                 <?php
                                 $stmt = $db->prepare("
                                     SELECT cp.*, u.name, u.email, u.country,
@@ -764,8 +767,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         <tbody>
                                             <?php foreach ($participations as $p): ?>
                                                 <tr>
-                                                    <td><?php echo htmlspecialchars($p['name']); ?></td>
-                                                    <td><?php echo htmlspecialchars($p['country']); ?></td>
+                                                    <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                    <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
                                                     <td>
                                                         <?php if ($p['participation_confirmed']): ?>
                                                             <span class="status completed">Yes</span>
@@ -775,7 +778,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                     </td>
                                                     <td>
                                                         <?php if ($p['partner_name']): ?>
-                                                            <?php echo htmlspecialchars($p['partner_name']); ?>
+                                                            <?php echo htmlspecialchars($p['partner_name'], ENT_QUOTES, 'UTF-8'); ?>
                                                         <?php else: ?>
                                                             -
                                                         <?php endif; ?>

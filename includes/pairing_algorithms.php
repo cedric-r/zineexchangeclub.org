@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 /**
  * Pairing Algorithm Plugin System
  * Different algorithms for pairing participants in exchange cycles
@@ -81,6 +82,14 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
         
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
+        
         return true;
     }
 }
@@ -120,6 +129,14 @@ class RandomAlgorithm implements PairingAlgorithm {
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
         
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
+        
         return true;
     }
 }
@@ -157,6 +174,14 @@ class SequentialAlgorithm implements PairingAlgorithm {
         // Mark cycle as paired
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
+        
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
         
         return true;
     }
@@ -230,6 +255,14 @@ class ZineTypeAlgorithm implements PairingAlgorithm {
         // Mark cycle as paired
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
+        
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
         
         return true;
     }
@@ -305,6 +338,14 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
         // Mark cycle as paired
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
+        
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
         
         return true;
     }
@@ -417,6 +458,13 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         // Fallback to random when no geographic proximity was achievable
         if ($bestScore <= 0) {
             $randomAlgo = new RandomAlgorithm();
+            // Check for unpaired participant (odd count) before fallback
+            $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+            $checkStmt->execute([$cycleId]);
+            $unpaired = (int)$checkStmt->fetchColumn();
+            if ($unpaired > 0) {
+                error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+            }
             return $randomAlgo->pair($db, $cycleId);
         }
 
@@ -430,7 +478,15 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
 
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
         $stmt->execute([$cycleId]);
-
+        
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
+        
         return true;
     }
 
@@ -474,7 +530,7 @@ class PairingAlgorithmFactory {
      */
     public static function getAlgorithm($algorithmName) {
         if (!isset(self::$algorithms[$algorithmName])) {
-            throw new InvalidArgumentException("Unknown pairing algorithm: {$algorithmName}");
+            throw new \InvalidArgumentException("Unknown pairing algorithm: {$algorithmName}");
         }
         
         $className = self::$algorithms[$algorithmName];
@@ -522,6 +578,14 @@ function pairParticipants($cycleId, $db) {
                 // Store token for confirmation
                 $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
                 $stmt->execute([$token, $tokenExpires, $cycleId, $user['user_id']]);
+            }
+            
+            // Check for unpaired participant (odd count)
+            $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+            $checkStmt->execute([$cycleId]);
+            $unpaired = (int)$checkStmt->fetchColumn();
+            if ($unpaired > 0) {
+                error_log("[pairParticipants] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
             }
         }
 

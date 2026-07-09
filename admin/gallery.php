@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once '../config.php';
 require_once '../includes/auth.php';
 require_once '../includes/functions.php';
@@ -33,8 +34,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             finfo_close($finfo);
 
             if (in_array($mime, $allowedTypes)) {
-                $extension = pathinfo($_FILES['photo']['name'], PATHINFO_EXTENSION);
-                $filename = uniqid() . '.' . $extension;
+                $extension = match($mime) {
+                    'image/jpeg' => 'jpg',
+                    'image/png' => 'png',
+                    'image/gif' => 'gif',
+                    'image/webp' => 'webp',
+                    default => 'jpg',
+                };
+                $filename = bin2hex(random_bytes(16)) . '.' . $extension;
                 $uploadPath = '../uploads/' . $filename;
 
                 if (!is_dir('../uploads')) {

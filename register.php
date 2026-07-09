@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
@@ -57,10 +58,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $stmt = $db->prepare("SELECT id FROM cycles WHERE registration_open = 1 AND status = 'active'");
                 $stmt->execute();
                 $openCycles = $stmt->fetchAll();
-                
+
                 foreach ($openCycles as $cycle) {
-                    $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate) VALUES (?, ?, 1) ON DUPLICATE KEY UPDATE wants_to_participate = 1");
+                    // Check if participation already exists
+                    $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ?");
                     $stmt->execute([$cycle['id'], $userId]);
+                    $existingParticipation = $stmt->fetch();
+
+                    if ($existingParticipation) {
+                        // Update existing participation
+                        $stmt = $db->prepare("UPDATE cycle_participations SET wants_to_participate = 1 WHERE cycle_id = ? AND user_id = ?");
+                        $stmt->execute([$cycle['id'], $userId]);
+                    } else {
+                        // Insert new participation
+                        $stmt = $db->prepare("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate) VALUES (?, ?, 1)");
+                        $stmt->execute([$cycle['id'], $userId]);
+                    }
                 }
                 
                 $db->commit();

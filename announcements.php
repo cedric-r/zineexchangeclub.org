@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 require_once 'config.php';
 require_once 'includes/auth.php';
 require_once 'includes/email.php';
@@ -200,7 +201,7 @@ if (!empty($announcementIds)) {
             <h1>Announcements</h1>
             
             <?php if ($message): ?>
-                <div class="message <?php echo $messageType; ?>"><?php echo htmlspecialchars($message); ?></div>
+                <div class="message <?php echo $messageType; ?>"><?php echo htmlspecialchars($message, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
             
             <?php if (isAdmin()): ?>
@@ -239,10 +240,10 @@ if (!empty($announcementIds)) {
                     <?php foreach ($announcements as $announcement): ?>
                         <article class="announcement">
                             <div class="announcement-header">
-                                <h3><?php echo htmlspecialchars($announcement['title']); ?></h3>
+                                <h3><?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
                                 <div class="announcement-meta">
                                     <span class="date">Posted: <?php echo date('F j, Y g:i A', strtotime($announcement['created_at'])); ?></span>
-                                    <span class="author">by <?php echo htmlspecialchars($announcement['created_by_name']); ?></span>
+                                    <span class="author">by <?php echo htmlspecialchars($announcement['created_by_name'], ENT_QUOTES, 'UTF-8'); ?></span>
                                     <?php if (strtotime($announcement['updated_at']) > strtotime($announcement['created_at']) + 5): ?>
                                         <span class="updated">Updated: <?php echo date('F j, Y g:i A', strtotime($announcement['updated_at'])); ?></span>
                                     <?php endif; ?>
@@ -252,15 +253,15 @@ if (!empty($announcementIds)) {
                                 </div>
                             </div>
                             <div class="announcement-content">
-                                <?php echo nl2br(htmlspecialchars($announcement['content'])); ?>
+                                <?php echo nl2br(htmlspecialchars($announcement['content'], ENT_QUOTES, 'UTF-8')); ?>
                             </div>
                             
                             <?php if (isAdmin()): ?>
                                 <div class="announcement-actions">
                                     <button class="btn-small" onclick="editAnnouncement(this)" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES); ?>" data-content="<?php echo htmlspecialchars($announcement['content'], ENT_QUOTES); ?>">Edit</button>
-                                    <button class="btn-small btn-danger" onclick="deleteAnnouncement(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title']); ?>')">Delete</button>
+                                    <button class="btn-small btn-danger" onclick="deleteAnnouncement(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
                                     <?php if (!$announcement['email_sent']): ?>
-                                        <button class="btn-small" onclick="sendAnnouncementToAll(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title']); ?>')">Send to All Users</button>
+                                        <button class="btn-small" onclick="sendAnnouncementToAll(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>')">Send to All Users</button>
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>

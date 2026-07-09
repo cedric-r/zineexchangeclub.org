@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 // Authentication functions
 
 require_once __DIR__ . '/../config.php';
@@ -50,6 +51,7 @@ function login($email, $password) {
         $_SESSION['user_id'] = $user['id'];
         $_SESSION['user_name'] = $user['name'];
         $_SESSION['is_admin'] = $user['is_admin'];
+        session_regenerate_id(true);
         return ['success' => true];
     }
     
@@ -58,6 +60,13 @@ function login($email, $password) {
 
 function logout() {
     session_destroy();
+    setcookie(session_name(), '', [
+        'expires' => time() - 3600,
+        'path' => '/',
+        'secure' => true,
+        'httponly' => true,
+        'samesite' => 'Strict'
+    ]);
     header('Location: /index.php');
     exit;
 }
