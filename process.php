@@ -29,8 +29,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['confirm_participation'])) {
         $cycleId = (int)$_POST['cycle_id'];
 
-        // Look up the confirmation token from the database
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND participation_confirmed = 0 AND confirmation_token IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
+        // User is authenticated via session — no token needed for in-page confirmation
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND participation_confirmed = 0");
         $stmt->execute([$cycleId, $userId]);
 
         if ($stmt->fetch()) {
@@ -75,8 +75,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['confirm_pairing'])) {
         $cycleId = (int)$_POST['cycle_id'];
 
-        // Look up the confirmation token from the database
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL AND confirmation_token IS NOT NULL AND (confirmation_token_expires IS NULL OR confirmation_token_expires > NOW())");
+        // User is authenticated via session — no token needed for in-page confirmation
+        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL");
         $stmt->execute([$cycleId, $userId]);
 
         if ($stmt->fetch()) {
