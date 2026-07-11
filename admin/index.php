@@ -6,6 +6,16 @@ require_once '../includes/email.php';
 require_once '../includes/functions.php';
 require_once '../includes/pairing_algorithms.php';
 
+// Allow stopping impersonation before the admin check — impersonated
+// users have is_admin=0 and would be blocked by requireAdmin().
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['stop_impersonating'])) {
+    if (validateCsrfToken($_POST['csrf_token'] ?? '')) {
+        stopImpersonating();
+    }
+    header('Location: index.php');
+    exit;
+}
+
 requireAdmin();
 
 $db = getDB();
