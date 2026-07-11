@@ -3,7 +3,7 @@
     <strong>Impersonating:</strong> <?php echo htmlspecialchars($_SESSION['user_name'] ?? '', ENT_QUOTES, 'UTF-8'); ?>
     (ID: <?php echo (int)($_SESSION['user_id'] ?? 0); ?>)
     &nbsp;|&nbsp;
-    <form method="post" action="<?php echo SITE_URL; ?>/admin/index.php" style="display:inline;">
+    <form method="post" action="/admin/index.php" style="display:inline;">
         <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
         <button type="submit" name="stop_impersonating" 
                 style="background:#fff;color:#dc3545;border:none;border-radius:3px;padding:2px 10px;cursor:pointer;font-size:13px;">
@@ -13,7 +13,7 @@
 </div>
 <?php endif; ?>
 <header>
-    <img src="<?php echo SITE_URL; ?>/zineexchangeclub_banner.png" alt="Banner" class="banner">
+    <img src="/zineexchangeclub_banner.png" alt="Banner" class="banner">
     <button class="menu-toggle" id="menuToggle" aria-label="Toggle menu">
         <span></span>
         <span></span>
