@@ -357,6 +357,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $messageType = 'error';
         }
     }
+    
+    if (isset($_POST['impersonate_user'])) {
+        $targetUserId = (int)$_POST['user_id'];
+        
+        if (startImpersonating($targetUserId)) {
+            header('Location: ../index.php');
+            exit;
+        } else {
+            $message = 'Cannot impersonate that user.';
+            $messageType = 'error';
+        }
+    }
+    
+    if (isset($_POST['stop_impersonating'])) {
+        stopImpersonating();
+        header('Location: index.php');
+        exit;
+    }
 }
 
 // Get all cycles
@@ -691,6 +709,16 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                     <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                                     <td>
                                         <button class="btn-small" onclick="editUser(<?php echo $user['id']; ?>)">Edit</button>
+                                        <?php if ($user['id'] !== (int)$_SESSION['user_id'] && !$user['is_admin']): ?>
+                                            <form method="post" class="inline-form" style="display:inline;">
+                                                <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                                                <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
+                                                <button type="submit" name="impersonate_user" class="btn-small"
+                                                        onclick="return confirm('Impersonate <?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>? You will see the site as they do. Click Stop Impersonating to return.');">
+                                                    Impersonate
+                                                </button>
+                                            </form>
+                                        <?php endif; ?>
                                         <?php if (!$user['email_confirmed']): ?>
                                             <button class="btn-small" onclick="resendConfirmationEmail(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?>')">Resend Confirmation</button>
                                         <?php endif; ?>
