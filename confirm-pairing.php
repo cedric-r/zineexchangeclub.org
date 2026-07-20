@@ -12,25 +12,25 @@ if ($token) {
 
     $stmt = $db->prepare("
         SELECT cp.id, cp.user_id, cp.cycle_id, c.name
-        FROM cycle_participations cp
+        FROM cycle_pairings cp
         JOIN cycles c ON cp.cycle_id = c.id
-        WHERE cp.confirmation_token = ? AND cp.pairing_confirmed = 0 AND cp.paired_with_id IS NOT NULL AND (cp.confirmation_token_expires IS NULL OR cp.confirmation_token_expires > NOW())
+        WHERE cp.confirmation_token = ? AND cp.pairing_confirmed = 0 AND (cp.confirmation_token_expires IS NULL OR cp.confirmation_token_expires > NOW())
     ");
     $stmt->execute([$token]);
-    $participation = $stmt->fetch();
+    $pairing = $stmt->fetch();
 
-    if (!$participation) {
+    if (!$pairing) {
         $message = 'Invalid or expired confirmation token. The token may have already been used.';
     } elseif (!isLoggedIn()) {
         header('Location: login.php');
         exit;
-    } elseif ($participation['user_id'] != $_SESSION['user_id']) {
+    } elseif ($pairing['user_id'] != $_SESSION['user_id']) {
         $message = 'This confirmation link is for a different account. Please log in with the correct account.';
     } else {
-        $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1, confirmation_token = NULL WHERE id = ?");
-        $stmt->execute([$participation['id']]);
+        $stmt = $db->prepare("UPDATE cycle_pairings SET pairing_confirmed = 1, confirmation_token = NULL WHERE id = ?");
+        $stmt->execute([$pairing['id']]);
         $success = true;
-        $message = 'Your pairing for ' . htmlspecialchars($participation['name']) . ' has been confirmed!';
+        $message = 'Your pairing for ' . htmlspecialchars($pairing['name']) . ' has been confirmed!';
     }
 } else {
     $message = 'No confirmation token provided.';

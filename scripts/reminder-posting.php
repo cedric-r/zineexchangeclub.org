@@ -11,11 +11,10 @@ $db = getDB();
 // Find users who were paired more than 14 days ago but haven't reported sending
 $stmt = $db->prepare("
     SELECT cp.user_id, cp.cycle_id, u.name, u.email, c.name as cycle_name, c.start_date
-    FROM cycle_participations cp
+    FROM cycle_pairings cp
     JOIN users u ON cp.user_id = u.id
     JOIN cycles c ON cp.cycle_id = c.id
     WHERE c.pairing_done = 1
-    AND cp.paired_with_id IS NOT NULL
     AND cp.zine_sent = 0
     AND c.start_date <= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
     AND u.email_confirmed = 1

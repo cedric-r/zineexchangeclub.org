@@ -11,8 +11,8 @@ $db = getDB();
 // Find users whose partner sent a zine more than 14 days ago but they haven't reported receiving
 $stmt = $db->prepare("
     SELECT cp_recipient.user_id, cp_recipient.cycle_id, u.name, u.email, c.name as cycle_name, cp_sender.zine_sent_date
-    FROM cycle_participations cp_sender
-    JOIN cycle_participations cp_recipient ON cp_sender.user_id = cp_recipient.paired_with_id
+    FROM cycle_pairings cp_sender
+    JOIN cycle_pairings cp_recipient ON cp_sender.user_id = cp_recipient.partner_id AND cp_sender.partner_id = cp_recipient.user_id
     JOIN users u ON cp_recipient.user_id = u.id
     JOIN cycles c ON cp_sender.cycle_id = c.id
     WHERE cp_sender.zine_sent = 1

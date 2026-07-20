@@ -74,56 +74,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     
     if (isset($_POST['confirm_pairing'])) {
         $cycleId = (int)$_POST['cycle_id'];
+        $pairingId = isset($_POST['pairing_id']) ? (int)$_POST['pairing_id'] : 0;
 
-        // User is authenticated via session — no token needed for in-page confirmation
-        $stmt = $db->prepare("SELECT id FROM cycle_participations WHERE cycle_id = ? AND user_id = ? AND pairing_confirmed = 0 AND paired_with_id IS NOT NULL");
-        $stmt->execute([$cycleId, $userId]);
+        if ($pairingId > 0) {
+            // Confirm specific pairing
+            $stmt = $db->prepare("SELECT id FROM cycle_pairings WHERE id = ? AND cycle_id = ? AND user_id = ? AND pairing_confirmed = 0");
+            $stmt->execute([$pairingId, $cycleId, $userId]);
 
-        if ($stmt->fetch()) {
-            $stmt = $db->prepare("UPDATE cycle_participations SET pairing_confirmed = 1, confirmation_token = NULL WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$cycleId, $userId]);
-            $message = 'Pairing confirmed!';
-            $messageType = 'success';
-        } else {
-            $message = 'Invalid or expired pairing confirmation token.';
-            $messageType = 'error';
-        }
-    }
-    
-    if (isset($_POST['report_sent'])) {
-        $cycleId = (int)$_POST['cycle_id'];
-        
-        $stmt = $db->prepare("UPDATE cycle_participations SET zine_sent = 1, zine_sent_date = CURDATE() WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        
-        // Notify the recipient
-        $stmt = $db->prepare("SELECT paired_with_id FROM cycle_participations WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        $participation = $stmt->fetch();
-        
-        if ($participation && $participation['paired_with_id']) {
-            $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
-            $stmt->execute([$participation['paired_with_id']]);
-            $recipient = $stmt->fetch();
-            
-            if ($recipient) {
-                $emailBody = getZinePostedEmail($recipient['name']);
-                sendEmail($recipient['email'], 'A ' . CONTENT_TYPE . ' is on its way to you! - ' . SITE_TITLE, $emailBody);
-                logEmail($recipient['id'], $cycleId, 'zine_posted_notification');
+            if ($stmt->fetch()) {
+                $stmt = $db->prepare("UPDATE cycle_pairings SET pairing_confirmed = 1, confirmation_token = NULL WHERE id = ?");
+                $stmt->execute([$pairingId]);
+                $message = 'Pairing confirmed!';
+                $messageType = 'success';
+            } else {
+                $message = 'Pairing already confirmed or not found.';
+                $messageType = 'error';
             }
         }
-        
-        $message = ucfirst(CONTENT_TYPE) . ' sent reported successfully!';
-        $messageType = 'success';
     }
-    
+
+    if (isset($_POST['report_sent'])) {
+        $cycleId = (int)$_POST['cycle_id'];
+        $pairingId = isset($_POST['pairing_id']) ? (int)$_POST['pairing_id'] : 0;
+
+        if ($pairingId > 0) {
+            $stmt = $db->prepare("UPDATE cycle_pairings SET zine_sent = 1, zine_sent_date = CURDATE() WHERE id = ? AND cycle_id = ? AND user_id = ?");
+            $stmt->execute([$pairingId, $cycleId, $userId]);
+
+            // Notify the recipient
+            $stmt = $db->prepare("SELECT partner_id FROM cycle_pairings WHERE id = ?");
+            $stmt->execute([$pairingId]);
+            $pairing = $stmt->fetch();
+
+            if ($pairing && $pairing['partner_id']) {
+                $stmt = $db->prepare("SELECT name, email FROM users WHERE id = ?");
+                $stmt->execute([$pairing['partner_id']]);
+                $recipient = $stmt->fetch();
+
+                if ($recipient) {
+                    $emailBody = getZinePostedEmail($recipient['name']);
+                    sendEmail($recipient['email'], 'A ' . CONTENT_TYPE . ' is on its way to you! - ' . SITE_TITLE, $emailBody);
+                    logEmail($recipient['id'], $cycleId, 'zine_posted_notification');
+                }
+            }
+
+            $message = ucfirst(CONTENT_TYPE) . ' sent reported successfully!';
+            $messageType = 'success';
+        }
+    }
+
     if (isset($_POST['report_received'])) {
         $cycleId = (int)$_POST['cycle_id'];
-        
-        $stmt = $db->prepare("UPDATE cycle_participations SET zine_received = 1, zine_received_date = CURDATE() WHERE cycle_id = ? AND user_id = ?");
-        $stmt->execute([$cycleId, $userId]);
-        $message = ucfirst(CONTENT_TYPE) . ' received reported successfully!';
-        $messageType = 'success';
+        $pairingId = isset($_POST['pairing_id']) ? (int)$_POST['pairing_id'] : 0;
+
+        if ($pairingId > 0) {
+            $stmt = $db->prepare("UPDATE cycle_pairings SET zine_received = 1, zine_received_date = CURDATE() WHERE id = ? AND cycle_id = ? AND user_id = ?");
+            $stmt->execute([$pairingId, $cycleId, $userId]);
+            $message = ucfirst(CONTENT_TYPE) . ' received reported successfully!';
+            $messageType = 'success';
+        }
     }
     
     if (isset($_POST['upload_photo']) && isset($_FILES['photo'])) {
@@ -173,21 +182,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Get user's participations (active cycles + closed cycles where user received zine but hasn't uploaded a photo)
 $stmt = $db->prepare("
-    SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open,
-           u.name as partner_name, u.email as partner_email, u.postal_address as partner_address, u.country as partner_country
+    SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
-    LEFT JOIN users u ON cp.paired_with_id = u.id
     WHERE cp.user_id = ?
       AND (
           c.status = 'active'
-          OR (c.status = 'closed' AND cp.zine_received = 1
+          OR (c.status = 'closed'
+              AND EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1)
               AND NOT EXISTS (SELECT 1 FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id))
       )
     ORDER BY c.start_date DESC
 ");
 $stmt->execute([$userId]);
 $participations = $stmt->fetchAll();
+
+// For each participation, fetch all pairings
+$allPairings = [];
+foreach ($participations as $p) {
+    $pairStmt = $db->prepare("
+        SELECT cp.*, u.name as partner_name, u.email as partner_email,
+               u.postal_address as partner_address, u.country as partner_country
+        FROM cycle_pairings cp
+        JOIN users u ON cp.partner_id = u.id
+        WHERE cp.cycle_id = ? AND cp.user_id = ?
+        ORDER BY u.name
+    ");
+    $pairStmt->execute([$p['cycle_id'], $userId]);
+    $allPairings[$p['cycle_id']] = $pairStmt->fetchAll();
+}
+
+// Compute aggregate closed-cycle zine_received status (for photo upload section)
+// Use participation-level zine_received if at least one pairing received
+$receivedZineMap = [];
+foreach ($allPairings as $cycleId => $pairings) {
+    $receivedZineMap[$cycleId] = false;
+    foreach ($pairings as $pairing) {
+        if ($pairing['zine_received']) {
+            $receivedZineMap[$cycleId] = true;
+            break;
+        }
+    }
+}
 
 // Get open cycles that user hasn't participated in yet
 $stmt = $db->prepare("
@@ -282,11 +318,14 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                 <section class="participations">
                     <h2>My Participations</h2>
                     
-                    <?php foreach ($participations as $p): ?>
+                    <?php foreach ($participations as $p):
+                        $pairings = $allPairings[$p['cycle_id']] ?? [];
+                        $allConfirmed = !empty($pairings) && array_reduce($pairings, fn($c, $pair) => $c && $pair['pairing_confirmed'], true);
+                    ?>
                         <div class="participation-card">
                             <h3><?php echo htmlspecialchars($p['cycle_name']); ?></h3>
                             <p class="date">Started: <?php echo date('F j, Y', strtotime($p['start_date'])); ?></p>
-                            
+
                             <div class="progress-steps">
                                 <div class="step <?php echo $p['participation_confirmed'] ? 'completed' : 'pending'; ?>">
                                     <span class="step-icon"><?php echo $p['participation_confirmed'] ? '✓' : '○'; ?></span>
@@ -300,59 +339,67 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                         </form>
                                     <?php endif; ?>
                                 </div>
-                                
-                                <div class="step <?php echo $p['pairing_confirmed'] ? 'completed' : 'pending'; ?>">
-                                    <span class="step-icon"><?php echo $p['pairing_confirmed'] ? '✓' : '○'; ?></span>
-                                    <span class="step-label">Pairing Confirmed</span>
-                                    <?php if ($p['pairing_done'] && !$p['pairing_confirmed']): ?>
-                                        <form method="post" class="inline-form">
-                                            <?php $csrf = generateCsrfToken(); ?>
-                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
-                                            <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
-                                            <button type="submit" name="confirm_pairing" class="btn-small">Confirm</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                                
-                                <div class="step <?php echo $p['zine_sent'] ? 'completed' : 'pending'; ?>">
-                                    <span class="step-icon"><?php echo $p['zine_sent'] ? '✓' : '○'; ?></span>
-                                    <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Sent</span>
-                                    <?php if ($p['pairing_done'] && !$p['zine_sent']): ?>
-                                        <form method="post" class="inline-form">
-                                            <?php $csrf = generateCsrfToken(); ?>
-                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
-                                            <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
-                                            <button type="submit" name="report_sent" class="btn-small">Report Sent</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
-                                
-                                <div class="step <?php echo $p['zine_received'] ? 'completed' : 'pending'; ?>">
-                                    <span class="step-icon"><?php echo $p['zine_received'] ? '✓' : '○'; ?></span>
-                                    <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Received</span>
-                                    <?php if ($p['zine_sent'] && !$p['zine_received']): ?>
-                                        <form method="post" class="inline-form">
-                                            <?php $csrf = generateCsrfToken(); ?>
-                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
-                                            <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
-                                            <button type="submit" name="report_received" class="btn-small">Report Received</button>
-                                        </form>
-                                    <?php endif; ?>
-                                </div>
                             </div>
-                            
-                            <?php if ($p['paired_with_id']): ?>
-                                <div class="partner-info">
-                                    <h4>Your Exchange Partner</h4>
-                                    <p><strong>Name:</strong> <?php echo htmlspecialchars($p['partner_name']); ?></p>
-                                    <p><strong>Email:</strong> <?php echo htmlspecialchars($p['partner_email']); ?></p>
-                                    <p><strong>Country:</strong> <?php echo htmlspecialchars($p['partner_country']); ?></p>
-                                    <p><strong>Address:</strong></p>
-                                    <p class="address"><?php echo nl2br(htmlspecialchars($p['partner_address'])); ?></p>
-                                </div>
+
+                            <?php if ($p['pairing_done'] && !empty($pairings)): ?>
+                                <?php foreach ($pairings as $pairing): ?>
+                                    <div class="partner-info">
+                                        <h4>Exchange Partner: <?php echo htmlspecialchars($pairing['partner_name']); ?></h4>
+                                        <p><strong>Email:</strong> <?php echo htmlspecialchars($pairing['partner_email']); ?></p>
+                                        <p><strong>Country:</strong> <?php echo htmlspecialchars($pairing['partner_country']); ?></p>
+                                        <p><strong>Address:</strong></p>
+                                        <p class="address"><?php echo nl2br(htmlspecialchars($pairing['partner_address'])); ?></p>
+
+                                        <div class="progress-steps">
+                                            <div class="step <?php echo $pairing['pairing_confirmed'] ? 'completed' : 'pending'; ?>">
+                                                <span class="step-icon"><?php echo $pairing['pairing_confirmed'] ? '✓' : '○'; ?></span>
+                                                <span class="step-label">Pairing Confirmed</span>
+                                                <?php if ($p['pairing_done'] && !$pairing['pairing_confirmed']): ?>
+                                                    <form method="post" class="inline-form">
+                                                        <?php $csrf = generateCsrfToken(); ?>
+                                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                                        <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                                        <input type="hidden" name="pairing_id" value="<?php echo $pairing['id']; ?>">
+                                                        <button type="submit" name="confirm_pairing" class="btn-small">Confirm</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+
+                                            <div class="step <?php echo $pairing['zine_sent'] ? 'completed' : 'pending'; ?>">
+                                                <span class="step-icon"><?php echo $pairing['zine_sent'] ? '✓' : '○'; ?></span>
+                                                <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Sent to <?php echo htmlspecialchars($pairing['partner_name']); ?></span>
+                                                <?php if ($p['pairing_done'] && !$pairing['zine_sent']): ?>
+                                                    <form method="post" class="inline-form">
+                                                        <?php $csrf = generateCsrfToken(); ?>
+                                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                                        <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                                        <input type="hidden" name="pairing_id" value="<?php echo $pairing['id']; ?>">
+                                                        <button type="submit" name="report_sent" class="btn-small">Report Sent</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+
+                                            <div class="step <?php echo $pairing['zine_received'] ? 'completed' : 'pending'; ?>">
+                                                <span class="step-icon"><?php echo $pairing['zine_received'] ? '✓' : '○'; ?></span>
+                                                <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Received from <?php echo htmlspecialchars($pairing['partner_name']); ?></span>
+                                                <?php if ($pairing['zine_sent'] && !$pairing['zine_received']): ?>
+                                                    <form method="post" class="inline-form">
+                                                        <?php $csrf = generateCsrfToken(); ?>
+                                                        <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                                        <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                                        <input type="hidden" name="pairing_id" value="<?php echo $pairing['id']; ?>">
+                                                        <button type="submit" name="report_received" class="btn-small">Report Received</button>
+                                                    </form>
+                                                <?php endif; ?>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            <?php elseif ($p['pairing_done'] && empty($pairings)): ?>
+                                <p class="empty-state">Waiting for pairing assignment.</p>
                             <?php endif; ?>
-                            
-                            <?php if ($p['zine_received']): ?>
+
+                            <?php if ($receivedZineMap[$p['cycle_id']] ?? false): ?>
                                 <div class="upload-section">
                                     <h4>Upload Photo of Received <?php echo ucfirst(CONTENT_TYPE); ?></h4>
                                     <form method="post" enctype="multipart/form-data" class="form">

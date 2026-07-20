@@ -95,7 +95,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cycleId = (int)$_POST['cycle_id'];
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 0 WHERE id = ?");
         $stmt->execute([$cycleId]);
-        $stmt = $db->prepare("UPDATE cycle_participations SET participation_confirmed = 0, pairing_confirmed = 0, paired_with_id = NULL, zine_sent = 0, zine_sent_date = NULL, zine_received = 0, zine_received_date = NULL WHERE cycle_id = ?");
+        $stmt = $db->prepare("DELETE FROM cycle_pairings WHERE cycle_id = ?");
         $stmt->execute([$cycleId]);
         $message = 'Cycle reset successfully.';
         $messageType = 'success';
@@ -252,10 +252,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $db->prepare("
             SELECT cp.user_id, u.name, u.email,
                    p.name as partner_name, p.email as partner_email, p.postal_address as partner_address, p.country as partner_country
-            FROM cycle_participations cp
+            FROM cycle_pairings cp
             JOIN users u ON cp.user_id = u.id
-            JOIN users p ON cp.paired_with_id = p.id
-            WHERE cp.cycle_id = ? AND cp.paired_with_id IS NOT NULL
+            JOIN users p ON cp.partner_id = p.id
+            WHERE cp.cycle_id = ?
         ");
         $stmt->execute([$cycleId]);
         $pairedUsers = $stmt->fetchAll();
@@ -270,8 +270,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $emailCount++;
                 logEmail($user['user_id'], $cycleId, 'pairing_notification');
 
-                // Store token for confirmation
-                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
+                // Store token for confirmation on all user's pairings
+                $stmt = $db->prepare("UPDATE cycle_pairings SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
                 $stmt->execute([$token, $tokenExpires, $cycleId, $user['user_id']]);
             }
         }
@@ -349,15 +349,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $cycleId = (int)$_POST['cycle_id'];
         $user1 = (int)$_POST['user_1'];
         $user2 = (int)$_POST['user_2'];
-        
+
         if ($user1 > 0 && $user2 > 0 && $user1 !== $user2) {
             try {
-                $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-                $stmt->execute([$user2, $cycleId, $user1]);
-                $stmt->execute([$user1, $cycleId, $user2]);
+                $db->beginTransaction();
+
+                // Update pairings
+                $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+                $stmt->execute([$cycleId, $user1, $user2]);
+                $stmt->execute([$cycleId, $user2, $user1]);
+
+                // Generate confirmation tokens
+                $token1 = bin2hex(random_bytes(16));
+                $token2 = bin2hex(random_bytes(16));
+                $tokenExpires = date('Y-m-d H:i:s', strtotime('+14 days'));
+
+                $stmt = $db->prepare("UPDATE cycle_pairings SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt->execute([$token1, $tokenExpires, $cycleId, $user1]);
+                $stmt->execute([$token2, $tokenExpires, $cycleId, $user2]);
+
+                $db->commit();
+
+                // Send pairing notification emails
+                $pairs = [
+                    ['userId' => $user1, 'partnerId' => $user2, 'token' => $token1],
+                    ['userId' => $user2, 'partnerId' => $user1, 'token' => $token2],
+                ];
+
+                $infoStmt = $db->prepare("
+                    SELECT u.name, u.email, u.country,
+                           p.name AS partner_name, p.email AS partner_email, p.postal_address AS partner_address, p.country AS partner_country
+                    FROM users u
+                    JOIN users p ON p.id = ?
+                    WHERE u.id = ?
+                ");
+
+                foreach ($pairs as $pair) {
+                    $infoStmt->execute([$pair['partnerId'], $pair['userId']]);
+                    $info = $infoStmt->fetch();
+
+                    if ($info) {
+                        $partnerInfo = "Email: " . $info['partner_email'] . "\n" . $info['partner_address'];
+                        $emailBody = getPairingEmail($info['name'], $info['partner_name'], $partnerInfo, $info['partner_country'], $pair['token']);
+                        if (sendEmail($info['email'], 'Your Exchange Pairing', $emailBody)) {
+                            logEmail($pair['userId'], $cycleId, 'pairing_notification');
+                        }
+                    }
+                }
+
                 $message = 'Manual pairing completed successfully!';
                 $messageType = 'success';
             } catch (Exception $e) {
+                $db->rollBack();
                 error_log('Manual pairing failed: ' . $e->getMessage());
                 $message = 'Manual pairing failed.';
                 $messageType = 'error';
@@ -486,11 +529,11 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 $stmt->execute([$cycle['id']]);
                                 $confirmedParticipants = $stmt->fetchColumn();
                                 
-                                $stmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND zine_sent = 1");
+                                $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM cycle_pairings WHERE cycle_id = ? AND zine_sent = 1");
                                 $stmt->execute([$cycle['id']]);
                                 $sentCount = $stmt->fetchColumn();
                                 
-                                $stmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND zine_received = 1");
+                                $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM cycle_pairings WHERE cycle_id = ? AND zine_received = 1");
                                 $stmt->execute([$cycle['id']]);
                                 $receivedCount = $stmt->fetchColumn();
                                 ?>
@@ -554,46 +597,55 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         
                                         <?php if ($cycle['pairing_done']): ?>
                                         <?php
-                                        // Get unpaired participants for manual pairing
-                                        $unpairedStmt = $db->prepare("
-                                            SELECT cp.user_id, u.name, u.email, u.country
+                                        // Get all participants for manual pairing
+                                        // (includes already-paired users for odd-number support)
+                                        $allStmt = $db->prepare("
+                                            SELECT cp.user_id, u.name, u.email, u.country,
+                                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS is_paired
                                             FROM cycle_participations cp
                                             JOIN users u ON cp.user_id = u.id
-                                            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 
-                                              AND cp.wants_to_participate = 1 AND cp.paired_with_id IS NULL
-                                            ORDER BY u.name
+                                            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1
+                                              AND cp.wants_to_participate = 1
+                                            ORDER BY is_paired ASC, u.name
                                         ");
-                                        $unpairedStmt->execute([$cycle['id']]);
-                                        $unpairedUsers = $unpairedStmt->fetchAll();
+                                        $allStmt->execute([$cycle['id']]);
+                                        $participants = $allStmt->fetchAll();
+
+                                        $unpairedCount = 0;
+                                        foreach ($participants as $p) {
+                                            if (!$p['is_paired']) $unpairedCount++;
+                                        }
                                         ?>
-                                        <?php if (count($unpairedUsers) >= 2): ?>
+                                        <?php if ($unpairedCount >= 1 && count($participants) >= 2): ?>
                                         <form method="post" class="inline-form manual-pair-form">
                                             <?php $csrf = generateCsrfToken(); ?>
                                             <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <select name="user_1" required>
                                                 <option value="">-- Select user 1 --</option>
-                                                <?php foreach ($unpairedUsers as $u): ?>
+                                                <?php foreach ($participants as $u): ?>
                                                     <option value="<?php echo $u['user_id']; ?>">
                                                         <?php echo htmlspecialchars($u['name'], ENT_QUOTES, 'UTF-8'); ?>
                                                         (<?php echo htmlspecialchars($u['country'], ENT_QUOTES, 'UTF-8'); ?>)
+                                                        <?php if ($u['is_paired']): ?>[paired]<?php endif; ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
                                             <span style="margin:0 4px;">↔</span>
                                             <select name="user_2" required>
                                                 <option value="">-- Select user 2 --</option>
-                                                <?php foreach ($unpairedUsers as $u): ?>
+                                                <?php foreach ($participants as $u): ?>
                                                     <option value="<?php echo $u['user_id']; ?>">
                                                         <?php echo htmlspecialchars($u['name'], ENT_QUOTES, 'UTF-8'); ?>
                                                         (<?php echo htmlspecialchars($u['country'], ENT_QUOTES, 'UTF-8'); ?>)
+                                                        <?php if ($u['is_paired']): ?>[paired]<?php endif; ?>
                                                     </option>
                                                 <?php endforeach; ?>
                                             </select>
                                             <button type="submit" name="manual_pair" class="btn-small">Manual Pair</button>
                                         </form>
-                                        <?php elseif (count($unpairedUsers) === 1): ?>
-                                        <span class="status pending">1 unpaired — need at least 2 for manual pairing</span>
+                                        <?php elseif ($unpairedCount === 0): ?>
+                                        <span class="status success">All participants paired</span>
                                         <?php endif; ?>
                                         <?php endif; ?>
                                         
@@ -641,11 +693,11 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 $stmt->execute([$cycle['id']]);
                                 $totalParticipants = $stmt->fetchColumn();
                                 
-                                $stmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND zine_sent = 1");
+                                $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM cycle_pairings WHERE cycle_id = ? AND zine_sent = 1");
                                 $stmt->execute([$cycle['id']]);
                                 $sentCount = $stmt->fetchColumn();
                                 
-                                $stmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND zine_received = 1");
+                                $stmt = $db->prepare("SELECT COUNT(DISTINCT user_id) FROM cycle_pairings WHERE cycle_id = ? AND zine_received = 1");
                                 $stmt->execute([$cycle['id']]);
                                 $receivedCount = $stmt->fetchColumn();
                                 ?>
@@ -749,12 +801,29 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                     <?php foreach ($activeCycles as $cycle): ?>
                         <h3><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status open">(Active)</span></h3>
                         <?php
+                        // Pre-fetch all pairings for multi-partner support
+                        $pairStmt = $db->prepare("
+                            SELECT cp.user_id, u.name AS partner_name
+                            FROM cycle_pairings cp
+                            JOIN users u ON cp.partner_id = u.id
+                            WHERE cp.cycle_id = ?
+                            ORDER BY partner_name
+                        ");
+                        $pairStmt->execute([$cycle['id']]);
+                        $partnersMap = [];
+                        foreach ($pairStmt->fetchAll() as $row) {
+                            $partnersMap[$row['user_id']][] = $row['partner_name'];
+                        }
+
                         $stmt = $db->prepare("
                             SELECT cp.*, u.name, u.email, u.country,
-                                   p.name as partner_name
+                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.pairing_confirmed = 1) AS pairing_confirmed,
+                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_sent = 1) AS zine_sent,
+                                   (SELECT MAX(cp2.zine_sent_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_sent_date,
+                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1) AS zine_received,
+                                   (SELECT MAX(cp2.zine_received_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_received_date
                             FROM cycle_participations cp
                             JOIN users u ON cp.user_id = u.id
-                            LEFT JOIN users p ON cp.paired_with_id = p.id
                             WHERE cp.cycle_id = ?
                             ORDER BY u.name
                         ");
@@ -779,6 +848,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 </thead>
                                 <tbody>
                                     <?php foreach ($participations as $p): ?>
+                                        <?php $partnerNames = $partnersMap[$p['user_id']] ?? []; ?>
                                         <tr>
                                             <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                             <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -797,8 +867,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                 <?php endif; ?>
                                             </td>
                                             <td>
-                                                <?php if ($p['partner_name']): ?>
-                                                    <?php echo htmlspecialchars($p['partner_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                <?php if (!empty($partnerNames)): ?>
+                                                    <?php echo htmlspecialchars(implode(', ', $partnerNames), ENT_QUOTES, 'UTF-8'); ?>
                                                 <?php else: ?>
                                                     -
                                                 <?php endif; ?>
@@ -843,12 +913,29 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                             <?php foreach ($closedCycles as $cycle): ?>
                                 <h4><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status closed">(Archived)</span></h4>
                                 <?php
+                                // Pre-fetch all pairings for multi-partner support
+                                $archPairStmt = $db->prepare("
+                                    SELECT cp.user_id, u.name AS partner_name
+                                    FROM cycle_pairings cp
+                                    JOIN users u ON cp.partner_id = u.id
+                                    WHERE cp.cycle_id = ?
+                                    ORDER BY partner_name
+                                ");
+                                $archPairStmt->execute([$cycle['id']]);
+                                $archPartnersMap = [];
+                                foreach ($archPairStmt->fetchAll() as $row) {
+                                    $archPartnersMap[$row['user_id']][] = $row['partner_name'];
+                                }
+
                                 $stmt = $db->prepare("
                                     SELECT cp.*, u.name, u.email, u.country,
-                                           p.name as partner_name
+                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.pairing_confirmed = 1) AS pairing_confirmed,
+                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_sent = 1) AS zine_sent,
+                                           (SELECT MAX(cp2.zine_sent_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_sent_date,
+                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1) AS zine_received,
+                                           (SELECT MAX(cp2.zine_received_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_received_date
                                     FROM cycle_participations cp
                                     JOIN users u ON cp.user_id = u.id
-                                    LEFT JOIN users p ON cp.paired_with_id = p.id
                                     WHERE cp.cycle_id = ?
                                     ORDER BY u.name
                                 ");
@@ -872,6 +959,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         </thead>
                                         <tbody>
                                             <?php foreach ($participations as $p): ?>
+                                                <?php $partnerNames = $archPartnersMap[$p['user_id']] ?? []; ?>
                                                 <tr>
                                                     <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
                                                     <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
@@ -883,8 +971,8 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                                         <?php endif; ?>
                                                     </td>
                                                     <td>
-                                                        <?php if ($p['partner_name']): ?>
-                                                            <?php echo htmlspecialchars($p['partner_name'], ENT_QUOTES, 'UTF-8'); ?>
+                                                        <?php if (!empty($partnerNames)): ?>
+                                                            <?php echo htmlspecialchars(implode(', ', $partnerNames), ENT_QUOTES, 'UTF-8'); ?>
                                                         <?php else: ?>
                                                             -
                                                         <?php endif; ?>

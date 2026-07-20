@@ -176,6 +176,26 @@ function createTestSchema(PDO $db): void {
     ");
 
     $db->exec("
+        CREATE TABLE IF NOT EXISTS cycle_pairings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cycle_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            partner_id INTEGER NOT NULL,
+            pairing_confirmed INTEGER DEFAULT 0,
+            confirmation_token TEXT,
+            confirmation_token_expires TEXT,
+            zine_sent INTEGER DEFAULT 0,
+            zine_sent_date TEXT,
+            zine_received INTEGER DEFAULT 0,
+            zine_received_date TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (partner_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
+    $db->exec("
         CREATE TABLE IF NOT EXISTS email_logs (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER,

@@ -74,9 +74,9 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
             $user1 = $ordered[$i];
             $user2 = $ordered[$i + 1];
             
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+                $stmt->execute([$cycleId, $user1, $user2]);
+                $stmt->execute([$cycleId, $user2, $user1]);
         }
         
         // Mark cycle as paired
@@ -84,7 +84,7 @@ class CountryPriorityAlgorithm implements PairingAlgorithm {
         $stmt->execute([$cycleId]);
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -121,9 +121,9 @@ class RandomAlgorithm implements PairingAlgorithm {
             $user1 = $participants[$i];
             $user2 = $participants[$i + 1];
             
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
         }
         
         // Mark cycle as paired
@@ -131,7 +131,7 @@ class RandomAlgorithm implements PairingAlgorithm {
         $stmt->execute([$cycleId]);
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -167,9 +167,9 @@ class SequentialAlgorithm implements PairingAlgorithm {
             $user1 = $participants[$i];
             $user2 = $participants[$i + 1];
             
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
         }
         
         // Mark cycle as paired
@@ -177,7 +177,7 @@ class SequentialAlgorithm implements PairingAlgorithm {
         $stmt->execute([$cycleId]);
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -248,9 +248,9 @@ class ZineTypeAlgorithm implements PairingAlgorithm {
             $user1 = $ordered[$i];
             $user2 = $ordered[$i + 1];
             
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
         }
         
         // Mark cycle as paired
@@ -258,7 +258,7 @@ class ZineTypeAlgorithm implements PairingAlgorithm {
         $stmt->execute([$cycleId]);
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -331,9 +331,9 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
             $user1 = $ordered[$i];
             $user2 = $ordered[$i + 1];
             
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
         }
         
         // Mark cycle as paired
@@ -341,7 +341,7 @@ class CountryZineTypeAlgorithm implements PairingAlgorithm {
         $stmt->execute([$cycleId]);
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -545,9 +545,9 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         foreach ($bestPairs as $pair) {
             $user1 = $pair[0];
             $user2 = $pair[1];
-            $stmt = $db->prepare("UPDATE cycle_participations SET paired_with_id = ? WHERE cycle_id = ? AND user_id = ?");
-            $stmt->execute([$user2, $cycleId, $user1]);
-            $stmt->execute([$user1, $cycleId, $user2]);
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
         }
 
         $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
@@ -570,7 +570,7 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         error_log("[GeographicProximityAlgorithm] Cycle {$cycleId}: {$sameCountry} same-country, {$sameRegion} same-region, {$crossRegion} cross-region pairs");
         
         // Check for unpaired participant (odd count)
-        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
         $checkStmt->execute([$cycleId]);
         $unpaired = (int)$checkStmt->fetchColumn();
         if ($unpaired > 0) {
@@ -658,10 +658,10 @@ function pairParticipants($cycleId, $db) {
             $stmt = $db->prepare("
                 SELECT cp.user_id, u.name, u.email,
                        p.name as partner_name, p.email as partner_email, p.postal_address as partner_address, p.country as partner_country
-                FROM cycle_participations cp
-                JOIN users u ON cp.user_id = u.id
-                JOIN users p ON cp.paired_with_id = p.id
-                WHERE cp.cycle_id = ? AND cp.paired_with_id IS NOT NULL
+                FROM cycle_pairings cp
+		                JOIN users u ON cp.user_id = u.id
+		                JOIN users p ON cp.partner_id = p.id
+		                WHERE cp.cycle_id = ?
             ");
             $stmt->execute([$cycleId]);
             $pairedUsers = $stmt->fetchAll();
@@ -669,18 +669,19 @@ function pairParticipants($cycleId, $db) {
             foreach ($pairedUsers as $user) {
                 $token = bin2hex(random_bytes(16));
                 $tokenExpires = date('Y-m-d H:i:s', strtotime('+14 days'));
-                $partnerInfo = "Email: " . $user['partner_email'] . "\n" . $user['partner_address'];
+                $partnerInfo = "Email: " . $user['partner_email'] . "
+" . $user['partner_address'];
                 $emailBody = getPairingEmail($user['name'], $user['partner_name'], $partnerInfo, $user['partner_country'], $token);
                 sendEmail($user['email'], 'You\'ve Been Paired!', $emailBody);
                 logEmail($user['user_id'], $cycleId, 'pairing_notification');
 
                 // Store token for confirmation
-                $stmt = $db->prepare("UPDATE cycle_participations SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
+                $stmt = $db->prepare("UPDATE cycle_pairings SET confirmation_token = ?, confirmation_token_expires = ? WHERE cycle_id = ? AND user_id = ?");
                 $stmt->execute([$token, $tokenExpires, $cycleId, $user['user_id']]);
             }
             
             // Check for unpaired participant (odd count)
-            $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NULL AND participation_confirmed = 1 AND wants_to_participate = 1");
+            $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
             $checkStmt->execute([$cycleId]);
             $unpaired = (int)$checkStmt->fetchColumn();
             if ($unpaired > 0) {

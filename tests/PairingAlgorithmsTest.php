@@ -31,8 +31,8 @@ function addParticipation(PDO $db, int $cycleId, int $userId, bool $confirmed = 
  */
 function assertPairingsValid(string $label, PDO $db, int $cycleId, array $participants): void {
     $stmt = $db->prepare("
-        SELECT user_id, paired_with_id FROM cycle_participations
-        WHERE cycle_id = ? AND paired_with_id IS NOT NULL
+        SELECT user_id, partner_id FROM cycle_pairings
+        WHERE cycle_id = ?
         ORDER BY user_id
     ");
     $stmt->execute([$cycleId]);
@@ -43,7 +43,7 @@ function assertPairingsValid(string $label, PDO $db, int $cycleId, array $partic
     // Every paired user should have their partner also pointing back
     $pairMap = [];
     foreach ($pairs as $p) {
-        $pairMap[$p['user_id']] = (int)$p['paired_with_id'];
+        $pairMap[$p['user_id']] = (int)$p['partner_id'];
     }
 
     foreach ($pairMap as $uid => $partnerId) {
@@ -63,7 +63,7 @@ function assertPairingsValid(string $label, PDO $db, int $cycleId, array $partic
     }
     assert_true("{$label}: no participant paired with themselves", true);
 
-    // paired_with_id is NULL for unpaired (odd-count leftovers)
+    // No pairing record for unpaired (odd-count leftovers) — cycle_pairings only has paired users
     $unpaired = count($participants) - count($pairMap);
     assert_true("{$label}: unpaired count matches odd remainder", ($unpaired === 0) || ($unpaired === 1));
 
@@ -152,12 +152,7 @@ assertPairingsValid('CountryPriority 4 same-country', $db, $cycleId, [$us1, $us2
 
 // Verify same-country pairing: US paired with US, UK paired with UK
 $stmt = $db->prepare("
-    SELECT cp1.user_id, cp1.paired_with_id, u1.country AS c1, u2.country AS c2
-    FROM cycle_participations cp1
-    JOIN users u1 ON cp1.user_id = u1.id
-    JOIN cycle_participations cp2 ON cp1.paired_with_id = cp2.user_id AND cp2.cycle_id = cp1.cycle_id
-    JOIN users u2 ON cp2.user_id = u2.id
-    WHERE cp1.cycle_id = ? AND cp1.paired_with_id IS NOT NULL
+    SELECT cp.user_id, cp.partner_id, u1.country AS c1, u2.country AS c2\n\t    FROM cycle_pairings cp\n\t    JOIN users u1 ON cp.user_id = u1.id\n\t    JOIN users u2 ON cp.partner_id = u2.id\n\t    WHERE cp.cycle_id = ?
 ");
 $stmt->execute([$cycleId]);
 $pairs = $stmt->fetchAll();
@@ -223,13 +218,13 @@ assert_true('SequentialAlgorithm pairs 4 participants', $result === true);
 assertPairingsValid('SequentialAlgorithm 4', $db, $cycleId, $seqUsers);
 
 // Verify strict sequential order: [0,1] and [2,3]
-$stmt = $db->prepare("SELECT user_id, paired_with_id FROM cycle_participations WHERE cycle_id = ? AND paired_with_id IS NOT NULL ORDER BY user_id");
+$stmt = $db->prepare("SELECT user_id, partner_id FROM cycle_pairings WHERE cycle_id = ? ORDER BY user_id");
 $stmt->execute([$cycleId]);
 $pairs = $stmt->fetchAll();
-assert_equal('Sequential: first user paired with second', $seqUsers[1], (int)$pairs[0]['paired_with_id']);
-assert_equal('Sequential: second user paired with first', $seqUsers[0], (int)$pairs[1]['paired_with_id']);
+assert_equal('Sequential: first user paired with second', $seqUsers[1], (int)$pairs[0]['partner_id']);
+assert_equal('Sequential: second user paired with first', $seqUsers[0], (int)$pairs[1]['partner_id']);
 if (isset($pairs[2])) {
-    assert_equal('Sequential: third user paired with fourth', $seqUsers[3], (int)$pairs[2]['paired_with_id']);
+    assert_equal('Sequential: third user paired with fourth', $seqUsers[3], (int)$pairs[2]['partner_id']);
 }
 
 // ════════════════════════════════════════════════════════════════════
