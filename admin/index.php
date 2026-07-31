@@ -801,27 +801,22 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                     <?php foreach ($activeCycles as $cycle): ?>
                         <h3><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status open">(Active)</span></h3>
                         <?php
-                        // Pre-fetch all pairings for multi-partner support
+                        // Pre-fetch all pairings (one row per pairing, per-partner status)
                         $pairStmt = $db->prepare("
-                            SELECT cp.user_id, u.name AS partner_name
+                            SELECT cp.*, pu.name AS partner_name
                             FROM cycle_pairings cp
-                            JOIN users u ON cp.partner_id = u.id
+                            JOIN users pu ON cp.partner_id = pu.id
                             WHERE cp.cycle_id = ?
-                            ORDER BY partner_name
+                            ORDER BY pu.name
                         ");
                         $pairStmt->execute([$cycle['id']]);
-                        $partnersMap = [];
+                        $pairingsByUser = [];
                         foreach ($pairStmt->fetchAll() as $row) {
-                            $partnersMap[$row['user_id']][] = $row['partner_name'];
+                            $pairingsByUser[$row['user_id']][] = $row;
                         }
 
                         $stmt = $db->prepare("
-                            SELECT cp.*, u.name, u.email, u.country,
-                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.pairing_confirmed = 1) AS pairing_confirmed,
-                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_sent = 1) AS zine_sent,
-                                   (SELECT MAX(cp2.zine_sent_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_sent_date,
-                                   EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1) AS zine_received,
-                                   (SELECT MAX(cp2.zine_received_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_received_date
+                            SELECT cp.*, u.name, u.email, u.country
                             FROM cycle_participations cp
                             JOIN users u ON cp.user_id = u.id
                             WHERE cp.cycle_id = ?
@@ -848,59 +843,80 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                 </thead>
                                 <tbody>
                                     <?php foreach ($participations as $p): ?>
-                                        <?php $partnerNames = $partnersMap[$p['user_id']] ?? []; ?>
-                                        <tr>
-                                            <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                            <td>
-                                                <?php if ($p['wants_to_participate']): ?>
-                                                    <span class="status completed">Yes</span>
-                                                <?php else: ?>
-                                                    <span class="status pending">No</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($p['participation_confirmed']): ?>
-                                                    <span class="status completed">Yes</span>
-                                                <?php else: ?>
-                                                    <span class="status pending">No</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if (!empty($partnerNames)): ?>
-                                                    <?php echo htmlspecialchars(implode(', ', $partnerNames), ENT_QUOTES, 'UTF-8'); ?>
-                                                <?php else: ?>
-                                                    -
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($p['pairing_confirmed']): ?>
-                                                    <span class="status completed">Yes</span>
-                                                <?php else: ?>
-                                                    <span class="status pending">No</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($p['zine_sent']): ?>
-                                                    <span class="status completed">Yes</span>
-                                                    <?php if ($p['zine_sent_date']): ?>
-                                                        <small>(<?php echo date('M j', strtotime($p['zine_sent_date'])); ?>)</small>
+                                        <?php $pairs = $pairingsByUser[$p['user_id']] ?? []; ?>
+                                        <?php if (empty($pairs)): ?>
+                                            <tr>
+                                                <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                <td>
+                                                    <?php if ($p['wants_to_participate']): ?>
+                                                        <span class="status completed">Yes</span>
+                                                    <?php else: ?>
+                                                        <span class="status pending">No</span>
                                                     <?php endif; ?>
-                                                <?php else: ?>
-                                                    <span class="status pending">No</span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td>
-                                                <?php if ($p['zine_received']): ?>
-                                                    <span class="status completed">Yes</span>
-                                                    <?php if ($p['zine_received_date']): ?>
-                                                        <small>(<?php echo date('M j', strtotime($p['zine_received_date'])); ?>)</small>
+                                                </td>
+                                                <td>
+                                                    <?php if ($p['participation_confirmed']): ?>
+                                                        <span class="status completed">Yes</span>
+                                                    <?php else: ?>
+                                                        <span class="status pending">No</span>
                                                     <?php endif; ?>
-                                                <?php else: ?>
-                                                    <span class="status pending">No</span>
-                                                <?php endif; ?>
-                                            </td>
-                                        </tr>
+                                                </td>
+                                                <td>-</td>
+                                                <td><span class="status pending">No</span></td>
+                                                <td><span class="status pending">No</span></td>
+                                                <td><span class="status pending">No</span></td>
+                                            </tr>
+                                        <?php else: ?>
+                                            <?php foreach ($pairs as $pairing): ?>
+                                                <tr>
+                                                    <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                    <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                    <td>
+                                                        <?php if ($p['wants_to_participate']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($p['participation_confirmed']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td><?php echo htmlspecialchars($pairing['partner_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                    <td>
+                                                        <?php if ($pairing['pairing_confirmed']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($pairing['zine_sent']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                            <?php if ($pairing['zine_sent_date']): ?>
+                                                                <small>(<?php echo date('M j', strtotime($pairing['zine_sent_date'])); ?>)</small>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                    <td>
+                                                        <?php if ($pairing['zine_received']): ?>
+                                                            <span class="status completed">Yes</span>
+                                                            <?php if ($pairing['zine_received_date']): ?>
+                                                                <small>(<?php echo date('M j', strtotime($pairing['zine_received_date'])); ?>)</small>
+                                                            <?php endif; ?>
+                                                        <?php else: ?>
+                                                            <span class="status pending">No</span>
+                                                        <?php endif; ?>
+                                                    </td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
                                     <?php endforeach; ?>
                                 </tbody>
                             </table>
@@ -913,27 +929,22 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                             <?php foreach ($closedCycles as $cycle): ?>
                                 <h4><?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?> <span class="status closed">(Archived)</span></h4>
                                 <?php
-                                // Pre-fetch all pairings for multi-partner support
+                                // Pre-fetch all pairings (one row per pairing, per-partner status)
                                 $archPairStmt = $db->prepare("
-                                    SELECT cp.user_id, u.name AS partner_name
+                                    SELECT cp.*, pu.name AS partner_name
                                     FROM cycle_pairings cp
-                                    JOIN users u ON cp.partner_id = u.id
+                                    JOIN users pu ON cp.partner_id = pu.id
                                     WHERE cp.cycle_id = ?
-                                    ORDER BY partner_name
+                                    ORDER BY pu.name
                                 ");
                                 $archPairStmt->execute([$cycle['id']]);
-                                $archPartnersMap = [];
+                                $archPairingsByUser = [];
                                 foreach ($archPairStmt->fetchAll() as $row) {
-                                    $archPartnersMap[$row['user_id']][] = $row['partner_name'];
+                                    $archPairingsByUser[$row['user_id']][] = $row;
                                 }
 
                                 $stmt = $db->prepare("
-                                    SELECT cp.*, u.name, u.email, u.country,
-                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.pairing_confirmed = 1) AS pairing_confirmed,
-                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_sent = 1) AS zine_sent,
-                                           (SELECT MAX(cp2.zine_sent_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_sent_date,
-                                           EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1) AS zine_received,
-                                           (SELECT MAX(cp2.zine_received_date) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id) AS zine_received_date
+                                    SELECT cp.*, u.name, u.email, u.country
                                     FROM cycle_participations cp
                                     JOIN users u ON cp.user_id = u.id
                                     WHERE cp.cycle_id = ?
@@ -959,46 +970,66 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                         </thead>
                                         <tbody>
                                             <?php foreach ($participations as $p): ?>
-                                                <?php $partnerNames = $archPartnersMap[$p['user_id']] ?? []; ?>
-                                                <tr>
-                                                    <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                                    <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
-                                                    <td>
-                                                        <?php if ($p['participation_confirmed']): ?>
-                                                            <span class="status completed">Yes</span>
-                                                        <?php else: ?>
-                                                            <span class="status pending">No</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if (!empty($partnerNames)): ?>
-                                                            <?php echo htmlspecialchars(implode(', ', $partnerNames), ENT_QUOTES, 'UTF-8'); ?>
-                                                        <?php else: ?>
-                                                            -
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if ($p['pairing_confirmed']): ?>
-                                                            <span class="status completed">Yes</span>
-                                                        <?php else: ?>
-                                                            <span class="status pending">No</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if ($p['zine_sent']): ?>
-                                                            <span class="status completed">Yes</span>
-                                                        <?php else: ?>
-                                                            <span class="status pending">No</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                    <td>
-                                                        <?php if ($p['zine_received']): ?>
-                                                            <span class="status completed">Yes</span>
-                                                        <?php else: ?>
-                                                            <span class="status pending">No</span>
-                                                        <?php endif; ?>
-                                                    </td>
-                                                </tr>
+                                                <?php $pairs = $archPairingsByUser[$p['user_id']] ?? []; ?>
+                                                <?php if (empty($pairs)): ?>
+                                                    <tr>
+                                                        <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                        <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                        <td>
+                                                            <?php if ($p['participation_confirmed']): ?>
+                                                                <span class="status completed">Yes</span>
+                                                            <?php else: ?>
+                                                                <span class="status pending">No</span>
+                                                            <?php endif; ?>
+                                                        </td>
+                                                        <td>-</td>
+                                                        <td><span class="status pending">No</span></td>
+                                                        <td><span class="status pending">No</span></td>
+                                                        <td><span class="status pending">No</span></td>
+                                                    </tr>
+                                                <?php else: ?>
+                                                    <?php foreach ($pairs as $pairing): ?>
+                                                        <tr>
+                                                            <td><?php echo htmlspecialchars($p['name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                            <td><?php echo htmlspecialchars($p['country'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                            <td>
+                                                                <?php if ($p['participation_confirmed']): ?>
+                                                                    <span class="status completed">Yes</span>
+                                                                <?php else: ?>
+                                                                    <span class="status pending">No</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td><?php echo htmlspecialchars($pairing['partner_name'], ENT_QUOTES, 'UTF-8'); ?></td>
+                                                            <td>
+                                                                <?php if ($pairing['pairing_confirmed']): ?>
+                                                                    <span class="status completed">Yes</span>
+                                                                <?php else: ?>
+                                                                    <span class="status pending">No</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td>
+                                                                <?php if ($pairing['zine_sent']): ?>
+                                                                    <span class="status completed">Yes</span>
+                                                                    <?php if ($pairing['zine_sent_date']): ?>
+                                                                        <small>(<?php echo date('M j', strtotime($pairing['zine_sent_date'])); ?>)</small>
+                                                                    <?php endif; ?>
+                                                                <?php else: ?>
+                                                                    <span class="status pending">No</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                            <td>
+                                                                <?php if ($pairing['zine_received']): ?>
+                                                                    <span class="status completed">Yes</span>
+                                                                    <?php if ($pairing['zine_received_date']): ?>
+                                                                        <small>(<?php echo date('M j', strtotime($pairing['zine_received_date'])); ?>)</small>
+                                                                    <?php endif; ?>
+                                                                <?php else: ?>
+                                                                    <span class="status pending">No</span>
+                                                                <?php endif; ?>
+                                                            </td>
+                                                        </tr>
+                                                    <?php endforeach; ?>
+                                                <?php endif; ?>
                                             <?php endforeach; ?>
                                         </tbody>
                                     </table>

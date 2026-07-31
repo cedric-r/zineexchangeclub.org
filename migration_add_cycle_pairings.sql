@@ -1,9 +1,5 @@
 -- Migration: Add cycle_pairings table for multi-partner support
--- Run this after the previous migration(s).
--- After verifying, existing paired_with_id data can be migrated with:
---   INSERT INTO cycle_pairings (cycle_id, user_id, partner_id, pairing_confirmed, confirmation_token, confirmation_token_expires, zine_sent, zine_sent_date, zine_received, zine_received_date)
---   SELECT cycle_id, user_id, paired_with_id, pairing_confirmed, confirmation_token, confirmation_token_expires, zine_sent, zine_sent_date, zine_received, zine_received_date
---   FROM cycle_participations WHERE paired_with_id IS NOT NULL;
+-- Run migration_migrate_cycle_pairings.sql after this to copy existing data.
 
 CREATE TABLE IF NOT EXISTS cycle_pairings (
     id INT AUTO_INCREMENT PRIMARY KEY,

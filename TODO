@@ -1,0 +1,17 @@
+  migration_migrate_cycle_pairings.sql (new) — full migration with two passes:
+
+  1. Forward direction (A→B): copies A's status from cycle_participations
+  2. Reverse direction (B→A): self-joins cycle_participations to find B's matching row, copies B's status
+
+  Both use NOT EXISTS — idempotent, safe to re-run.
+
+  migration_add_cycle_pairings.sql (edited) — replaced outdated comment that suggested the incomplete single-direction insert.
+
+  Run order:
+  1. migration_add_cycle_pairings.sql     (already ran if table exists)
+  2. migration_migrate_cycle_pairings.sql  (copy existing data)
+
+  Optional cleanup after verifying: ALTER TABLE cycle_participations DROP COLUMN paired_with_id, DROP COLUMN pairing_confirmed, DROP COLUMN zine_sent,
+  DROP COLUMN zine_sent_date, DROP COLUMN zine_received, DROP COLUMN zine_received_date, DROP COLUMN confirmation_token, DROP COLUMN
+  confirmation_token_expires;
+
