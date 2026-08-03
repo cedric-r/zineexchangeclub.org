@@ -382,7 +382,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                             <div class="step <?php echo $pairing['zine_received'] ? 'completed' : 'pending'; ?>">
                                                 <span class="step-icon"><?php echo $pairing['zine_received'] ? '✓' : '○'; ?></span>
                                                 <span class="step-label"><?php echo ucfirst(CONTENT_TYPE); ?> Received from <?php echo htmlspecialchars($pairing['partner_name']); ?></span>
-                                                <?php if ($pairing['zine_sent'] && !$pairing['zine_received']): ?>
+                                                <?php if (!$pairing['zine_received']): ?>
                                                     <form method="post" class="inline-form">
                                                         <?php $csrf = generateCsrfToken(); ?>
                                                         <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
