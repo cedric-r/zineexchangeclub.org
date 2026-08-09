@@ -15,6 +15,7 @@ $stmt = $db->prepare("
     JOIN users u ON cp.user_id = u.id
     JOIN cycles c ON cp.cycle_id = c.id
     WHERE c.pairing_done = 1
+    AND c.status = 'active'
     AND cp.zine_sent = 0
     AND c.start_date <= DATE_SUB(CURDATE(), INTERVAL 14 DAY)
     AND u.email_confirmed = 1
