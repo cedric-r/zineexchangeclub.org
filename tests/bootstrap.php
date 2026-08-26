@@ -208,6 +208,19 @@ function createTestSchema(PDO $db): void {
     ");
 
     $db->exec("
+        CREATE TABLE IF NOT EXISTS gallery (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cycle_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            image_path TEXT NOT NULL,
+            caption TEXT,
+            created_at TEXT DEFAULT (datetime('now')),
+            FOREIGN KEY (cycle_id) REFERENCES cycles(id) ON DELETE CASCADE,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
+    ");
+
+    $db->exec("
         CREATE TABLE IF NOT EXISTS announcements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             title TEXT NOT NULL,
