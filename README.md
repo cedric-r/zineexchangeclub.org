@@ -253,7 +253,7 @@ zineexchangeclub.org/
 7. **Sending**: Users send their zine and report it on the site
 8. **Notification**: Recipients are notified when a zine is posted to them
 9. **Receiving**: Users report when they receive their zine
-10. **Gallery**: Users can upload photos of received zines to the gallery
+10. **Gallery**: Users can upload photos of received zines to the gallery — one photo per pairing, so participants with multiple pairings upload one photo per received zine; the cycle stays on My Process until all owed photos are uploaded
 
 ### Pairing Algorithms
 

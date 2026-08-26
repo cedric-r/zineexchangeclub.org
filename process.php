@@ -180,7 +180,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get user's participations (active cycles + closed cycles where user received zine but hasn't uploaded a photo)
+// Get user's participations (active cycles + closed cycles where the user still
+// owes a gallery photo, i.e. fewer photos uploaded than zines received)
 $stmt = $db->prepare("
     SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open
     FROM cycle_participations cp
@@ -190,7 +191,8 @@ $stmt = $db->prepare("
           c.status = 'active'
           OR (c.status = 'closed'
               AND EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1)
-              AND NOT EXISTS (SELECT 1 FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id))
+              AND (SELECT COUNT(*) FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id)
+                  < (SELECT COUNT(*) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1))
       )
     ORDER BY c.start_date DESC
 ");
@@ -212,16 +214,22 @@ foreach ($participations as $p) {
     $allPairings[$p['cycle_id']] = $pairStmt->fetchAll();
 }
 
-// Compute aggregate closed-cycle zine_received status (for photo upload section)
-// Use participation-level zine_received if at least one pairing received
-$receivedZineMap = [];
-foreach ($allPairings as $cycleId => $pairings) {
-    $receivedZineMap[$cycleId] = false;
-    foreach ($pairings as $pairing) {
+// Compute whether each cycle still needs a photo upload:
+// true while fewer photos have been uploaded than zines received
+$needsPhotoMap = [];
+$galleryCountStmt = $db->prepare("SELECT COUNT(*) FROM gallery WHERE cycle_id = ? AND user_id = ?");
+foreach ($participations as $p) {
+    $receivedCount = 0;
+    foreach ($allPairings[$p['cycle_id']] ?? [] as $pairing) {
         if ($pairing['zine_received']) {
-            $receivedZineMap[$cycleId] = true;
-            break;
+            $receivedCount++;
         }
+    }
+    if ($receivedCount > 0) {
+        $galleryCountStmt->execute([$p['cycle_id'], $userId]);
+        $needsPhotoMap[$p['cycle_id']] = (int)$galleryCountStmt->fetchColumn() < $receivedCount;
+    } else {
+        $needsPhotoMap[$p['cycle_id']] = false;
     }
 }
 
@@ -399,7 +407,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                                 <p class="empty-state">Waiting for pairing assignment.</p>
                             <?php endif; ?>
 
-                            <?php if ($receivedZineMap[$p['cycle_id']] ?? false): ?>
+                            <?php if ($needsPhotoMap[$p['cycle_id']] ?? false): ?>
                                 <div class="upload-section">
                                     <h4>Upload Photo of Received <?php echo ucfirst(CONTENT_TYPE); ?></h4>
                                     <form method="post" enctype="multipart/form-data" class="form">
