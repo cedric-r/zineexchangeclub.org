@@ -11,6 +11,10 @@ if (isLoggedIn()) {
 
 $error = '';
 
+// Where to go after login: only local paths (no scheme/host) are honored
+$next = $_REQUEST['next'] ?? '';
+$next = ($next !== '' && $next[0] === '/' && ($next[1] ?? '/') !== '/') ? $next : 'process.php';
+
 // Rate limiting: max 5 attempts per 15 minutes
 $rateLimitKey = 'login_attempts';
 if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked_until']) {
@@ -31,7 +35,7 @@ if (isset($_SESSION['login_blocked_until']) && time() < $_SESSION['login_blocked
     if ($result['success']) {
         unset($_SESSION[$rateLimitKey]);
         unset($_SESSION['login_blocked_until']);
-        header('Location: process.php');
+        header('Location: ' . $next);
         exit;
     } else {
         $_SESSION[$rateLimitKey] = ($_SESSION[$rateLimitKey] ?? 0) + 1;
@@ -85,6 +89,7 @@ $captchaData = getCaptchaQuestion();
             
             <form method="post" class="form">
                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
+                <?php if ($next !== 'process.php'): ?><input type="hidden" name="next" value="<?php echo htmlspecialchars($next, ENT_QUOTES, 'UTF-8'); ?>"><?php endif; ?>
                 <div class="form-group">
                     <label for="email">Email Address</label>
                     <input type="email" id="email" name="email" required>

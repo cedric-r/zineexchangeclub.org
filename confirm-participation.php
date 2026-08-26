@@ -10,19 +10,28 @@ $success = false;
 if ($token) {
     $db = getDB();
 
+    // Look up the token regardless of confirmed/expired state so we can
+    // give precise feedback instead of a blanket "invalid token" error
     $stmt = $db->prepare("
-        SELECT cp.id, cp.user_id, cp.cycle_id, c.name
+        SELECT cp.id, cp.user_id, cp.cycle_id, cp.participation_confirmed, cp.confirmation_token_expires, c.name
         FROM cycle_participations cp
         JOIN cycles c ON cp.cycle_id = c.id
-        WHERE cp.confirmation_token = ? AND cp.participation_confirmed = 0 AND (cp.confirmation_token_expires IS NULL OR cp.confirmation_token_expires > NOW())
+        WHERE cp.confirmation_token = ?
     ");
     $stmt->execute([$token]);
     $participation = $stmt->fetch();
+    $expired = $participation && $participation['confirmation_token_expires'] !== null
+        && strtotime($participation['confirmation_token_expires']) <= time();
 
     if (!$participation) {
-        $message = 'Invalid or expired confirmation token. The token may have already been used.';
+        $message = 'Invalid confirmation link. Please log in and confirm your participation from the My Process page.';
+    } elseif ($participation['participation_confirmed']) {
+        $success = true;
+        $message = 'Your participation in ' . htmlspecialchars($participation['name']) . ' has already been confirmed. No further action needed.';
+    } elseif ($expired) {
+        $message = 'This confirmation link has expired. Please log in and confirm your participation from the My Process page.';
     } elseif (!isLoggedIn()) {
-        header('Location: login.php');
+        header('Location: login.php?next=' . urlencode($_SERVER['REQUEST_URI']));
         exit;
     } elseif ($participation['user_id'] != $_SESSION['user_id']) {
         $message = 'This confirmation link is for a different account. Please log in with the correct account.';
@@ -71,6 +80,7 @@ if ($token) {
                 <?php if ($success): ?>
                     <a href="process.php" class="btn">View My Process</a>
                 <?php else: ?>
+                    <a href="login.php" class="btn">Log In</a>
                     <a href="index.php" class="btn">Return Home</a>
                 <?php endif; ?>
             </div>
