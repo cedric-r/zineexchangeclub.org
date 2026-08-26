@@ -455,8 +455,10 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="<?php echo generateCsrfToken(); ?>">
     <title>Admin - <?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="../css/style.css">
+    <script src="../js/admin.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -656,7 +658,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             <button type="submit" name="close_cycle" class="btn-small btn-danger">Close Cycle</button>
                                         </form>
                                         
-                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" data-action="delete-cycle" data-cycle-id="<?php echo $cycle['id']; ?>" data-cycle-name="<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>">Delete</button>
                                         
                                         <form method="post" class="inline-form">
                                                 <?php $csrf = generateCsrfToken(); ?>
@@ -715,7 +717,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                             <input type="hidden" name="cycle_id" value="<?php echo $cycle['id']; ?>">
                                             <button type="submit" name="reopen_cycle" class="btn-small">Reopen</button>
                                         </form>
-                                        <button class="btn-small btn-danger" onclick="deleteCycle(<?php echo $cycle['id']; ?>, '<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" data-action="delete-cycle" data-cycle-id="<?php echo $cycle['id']; ?>" data-cycle-name="<?php echo htmlspecialchars($cycle['name'], ENT_QUOTES, 'UTF-8'); ?>">Delete</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -770,21 +772,21 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
                                     </td>
                                     <td><?php echo date('M j, Y', strtotime($user['created_at'])); ?></td>
                                     <td>
-                                        <button class="btn-small" onclick="editUser(<?php echo $user['id']; ?>)">Edit</button>
+                                        <button class="btn-small" data-action="edit-user" data-user-id="<?php echo $user['id']; ?>">Edit</button>
                                         <?php if ($user['id'] !== (int)$_SESSION['user_id'] && !$user['is_admin']): ?>
-                                            <form method="post" class="inline-form" style="display:inline;">
+                                            <form method="post" class="inline-form" style="display:inline;"
+                                                  data-confirm="Impersonate <?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>? You will see the site as they do. Click Stop Impersonating to return.">
                                                 <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
                                                 <input type="hidden" name="user_id" value="<?php echo $user['id']; ?>">
-                                                <button type="submit" name="impersonate_user" class="btn-small"
-                                                        onclick="return confirm('Impersonate <?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>? You will see the site as they do. Click Stop Impersonating to return.');">
+                                                <button type="submit" name="impersonate_user" class="btn-small">
                                                     Impersonate
                                                 </button>
                                             </form>
                                         <?php endif; ?>
                                         <?php if (!$user['email_confirmed']): ?>
-                                            <button class="btn-small" onclick="resendConfirmationEmail(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?>')">Resend Confirmation</button>
+                                            <button class="btn-small" data-action="resend-confirmation" data-user-id="<?php echo $user['id']; ?>" data-email="<?php echo htmlspecialchars($user['email'], ENT_QUOTES, 'UTF-8'); ?>">Resend Confirmation</button>
                                         <?php endif; ?>
-                                        <button class="btn-small btn-danger" onclick="deleteUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
+                                        <button class="btn-small btn-danger" data-action="delete-user" data-user-id="<?php echo $user['id']; ?>" data-name="<?php echo htmlspecialchars($user['name'], ENT_QUOTES, 'UTF-8'); ?>">Delete</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -1046,7 +1048,7 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>Edit User</h2>
-                    <button class="modal-close" onclick="closeUserModal()">&times;</button>
+                    <button class="modal-close" data-close-modal>&times;</button>
                 </div>
                 <form method="post" class="form">
                     <?php $csrf = generateCsrfToken(); ?>
@@ -1087,65 +1089,5 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $_SESSION['user_id'])
         
         <?php require_once '../includes/footer.php'; ?>
     </div>
-    
-    <script>
-        const csrfToken = '<?php echo generateCsrfToken(); ?>';
-        function editUser(userId) {
-            const row = document.getElementById('user-row-' + userId);
-            if (row) {
-                document.getElementById('edit_user_id').value = userId;
-                document.getElementById('edit_name').value = row.dataset.name;
-                document.getElementById('edit_email').value = row.dataset.email;
-                document.getElementById('edit_country').value = row.dataset.country;
-                document.getElementById('edit_postal_address').value = row.dataset.postalAddress;
-                document.getElementById('edit_accepts_adult_zines').checked = row.dataset.acceptsAdultZines === '1';
-                document.getElementById('edit_is_admin').checked = row.dataset.isAdmin === '1';
-                document.getElementById('edit_email_confirmed').checked = row.dataset.emailConfirmed === '1';
-                document.getElementById('userEditModal').style.display = 'block';
-            }
-        }
-        
-        function closeUserModal() {
-            document.getElementById('userEditModal').style.display = 'none';
-        }
-        
-        function deleteUser(userId, userName) {
-            if (confirm(`Are you sure you want to delete user "${userName}"? This will permanently delete all their data including uploaded images and cannot be undone.`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="delete_user" value="1">';
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-
-        function resendConfirmationEmail(userId, userEmail) {
-            if (confirm(`Are you sure you want to resend confirmation email to "${userEmail}"?`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="user_id" value="' + userId + '"><input type="hidden" name="resend_confirmation" value="1">';
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-
-        function deleteCycle(cycleId, cycleName) {
-            if (confirm(`Are you sure you want to delete cycle "${cycleName}"? This will permanently delete all associated data including participations and uploaded images and cannot be undone.`)) {
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="cycle_id" value="' + cycleId + '"><input type="hidden" name="delete_cycle" value="1">';
-                document.body.appendChild(form);
-                form.submit();
-            }
-        }
-        
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('userEditModal');
-            if (event.target == modal) {
-                modal.style.display = 'none';
-            }
-        }
-    </script>
 </body>
 </html>

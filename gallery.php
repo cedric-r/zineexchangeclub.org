@@ -30,6 +30,7 @@ if (isLoggedIn()) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Gallery - <?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="css/style.css">
+    <script src="js/gallery.js" defer></script>
 </head>
 <body>
     <div class="container">
@@ -71,7 +72,9 @@ if (isLoggedIn()) {
                     <?php foreach ($galleryItems as $item): ?>
                         <div class="gallery-item">
                             <img src="<?php echo htmlspecialchars($item['image_path']); ?>" alt="<?php echo ucfirst(CONTENT_TYPE); ?> photo"
-                                 onclick="openLightbox(this, '<?php echo htmlspecialchars($item['caption'] ?? ''); ?>', '<?php echo htmlspecialchars($item['user_name']); ?>', '<?php echo htmlspecialchars($item['cycle_name']); ?>')">
+                                 data-caption="<?php echo htmlspecialchars($item['caption'] ?? '', ENT_QUOTES); ?>"
+                                 data-user-name="<?php echo htmlspecialchars($item['user_name'], ENT_QUOTES); ?>"
+                                 data-cycle-name="<?php echo htmlspecialchars($item['cycle_name'], ENT_QUOTES); ?>">
                             <div class="gallery-info">
                                 <p class="by">by <?php echo htmlspecialchars($item['user_name']); ?></p>
                                 <p class="cycle"><?php echo htmlspecialchars($item['cycle_name']); ?></p>
@@ -88,25 +91,10 @@ if (isLoggedIn()) {
         <?php require_once 'includes/footer.php'; ?>
     </div>
 
-    <div id="lightbox" class="lightbox" onclick="closeLightbox()">
+    <div id="lightbox" class="lightbox">
         <span class="lightbox-close">&times;</span>
         <img id="lightbox-img" src="" alt="">
         <div id="lightbox-caption" class="lightbox-caption"></div>
     </div>
-
-    <script>
-        function openLightbox(img, caption, userName, cycleName) {
-            document.getElementById('lightbox-img').src = img.src;
-            var parts = [];
-            if (caption) parts.push(caption);
-            parts.push('by ' + userName + ' &middot; ' + cycleName);
-            document.getElementById('lightbox-caption').innerHTML = parts.join('<br>');
-            document.getElementById('lightbox').classList.add('open');
-        }
-
-        function closeLightbox() {
-            document.getElementById('lightbox').classList.remove('open');
-        }
-    </script>
 </body>
 </html>

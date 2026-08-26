@@ -178,8 +178,10 @@ if (!empty($announcementIds)) {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <?php if (isAdmin()): ?><meta name="csrf-token" content="<?php echo generateCsrfToken(); ?>"><?php endif; ?>
     <title>Announcements - <?php echo SITE_TITLE; ?></title>
     <link rel="stylesheet" href="css/style.css">
+    <?php if (isAdmin()): ?><script src="js/announcements.js" defer></script><?php endif; ?>
 </head>
 <body>
     <div class="container">
@@ -258,10 +260,10 @@ if (!empty($announcementIds)) {
                             
                             <?php if (isAdmin()): ?>
                                 <div class="announcement-actions">
-                                    <button class="btn-small" onclick="editAnnouncement(this)" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES); ?>" data-content="<?php echo htmlspecialchars($announcement['content'], ENT_QUOTES); ?>">Edit</button>
-                                    <button class="btn-small btn-danger" onclick="deleteAnnouncement(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>')">Delete</button>
+                                    <button class="btn-small" data-action="edit-announcement" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES); ?>" data-content="<?php echo htmlspecialchars($announcement['content'], ENT_QUOTES); ?>">Edit</button>
+                                    <button class="btn-small btn-danger" data-action="delete-announcement" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>">Delete</button>
                                     <?php if (!$announcement['email_sent']): ?>
-                                        <button class="btn-small" onclick="sendAnnouncementToAll(<?php echo $announcement['id']; ?>, '<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>')">Send to All Users</button>
+                                        <button class="btn-small" data-action="send-announcement-to-all" data-id="<?php echo $announcement['id']; ?>" data-title="<?php echo htmlspecialchars($announcement['title'], ENT_QUOTES, 'UTF-8'); ?>">Send to All Users</button>
                                     <?php endif; ?>
                                 </div>
                             <?php endif; ?>
@@ -273,14 +275,13 @@ if (!empty($announcementIds)) {
         
         <?php require_once 'includes/footer.php'; ?>
     </div>
-    
     <?php if (isAdmin()): ?>
         <!-- Edit announcement modal -->
         <div id="editModal" class="modal" style="display: none;">
             <div class="modal-content">
                 <div class="modal-header">
                     <h2>Edit Announcement</h2>
-                    <button class="modal-close" onclick="closeEditModal()">&times;</button>
+                    <button class="modal-close" data-close-modal>&times;</button>
                 </div>
                 <form method="post" class="form">
                     <input type="hidden" name="csrf_token" value="<?php echo generateCsrfToken(); ?>">
@@ -301,51 +302,6 @@ if (!empty($announcementIds)) {
                 </form>
             </div>
         </div>
-        
-        <script>
-            const csrfToken = '<?php echo generateCsrfToken(); ?>';
-            function editAnnouncement(button) {
-                const id = button.getAttribute('data-id');
-                const title = button.getAttribute('data-title');
-                const content = button.getAttribute('data-content');
-                document.getElementById('edit_announcement_id').value = id;
-                document.getElementById('edit_title').value = title;
-                document.getElementById('edit_content').value = content;
-                document.getElementById('editModal').style.display = 'block';
-            }
-            
-            function closeEditModal() {
-                document.getElementById('editModal').style.display = 'none';
-            }
-            
-            function deleteAnnouncement(id, title) {
-                if (confirm('Are you sure you want to delete announcement "' + title + '"? This action cannot be undone.')) {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="delete_announcement" value="1">';
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            }
-            
-            function sendAnnouncementToAll(id, title) {
-                if (confirm('Are you sure you want to send this announcement to all registered users: "' + title + '"?')) {
-                    const form = document.createElement('form');
-                    form.method = 'POST';
-                    form.innerHTML = '<input type="hidden" name="csrf_token" value="' + csrfToken + '"><input type="hidden" name="announcement_id" value="' + id + '"><input type="hidden" name="send_announcement_to_all" value="1">';
-                    document.body.appendChild(form);
-                    form.submit();
-                }
-            }
-            
-            // Close modal when clicking outside
-            window.onclick = function(event) {
-                const modal = document.getElementById('editModal');
-                if (event.target == modal) {
-                    modal.style.display = 'none';
-                }
-            }
-        </script>
     <?php endif; ?>
 </body>
 </html>
