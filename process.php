@@ -180,28 +180,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Get user's participations (active cycles + closed cycles where the user still
-// owes a gallery photo, i.e. fewer photos uploaded than zines received)
+// Get user's participations in active cycles (the "current work" section)
 $stmt = $db->prepare("
     SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
     WHERE cp.user_id = ?
-      AND (
-          c.status = 'active'
-          OR (c.status = 'closed'
-              AND EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1)
-              AND (SELECT COUNT(*) FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id)
-                  < (SELECT COUNT(*) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1))
-      )
+      AND c.status = 'active'
     ORDER BY c.start_date DESC
 ");
 $stmt->execute([$userId]);
 $participations = $stmt->fetchAll();
 
-// For each participation, fetch all pairings
+// Past cycles the user took part in (confirmed participation or actually paired),
+// shown collapsed by default in the archive section
+$stmt = $db->prepare("
+    SELECT cp.*, c.name as cycle_name, c.start_date
+    FROM cycle_participations cp
+    JOIN cycles c ON cp.cycle_id = c.id
+    WHERE cp.user_id = ?
+      AND c.status = 'closed'
+      AND (cp.participation_confirmed = 1
+           OR EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id))
+    ORDER BY c.start_date DESC
+");
+$stmt->execute([$userId]);
+$pastCycles = $stmt->fetchAll();
+
+// For each cycle (active + past), fetch all pairings
 $allPairings = [];
-foreach ($participations as $p) {
+foreach (array_merge($participations, $pastCycles) as $p) {
     $pairStmt = $db->prepare("
         SELECT cp.*, u.name as partner_name, u.email as partner_email,
                u.postal_address as partner_address, u.country as partner_country
@@ -214,11 +222,19 @@ foreach ($participations as $p) {
     $allPairings[$p['cycle_id']] = $pairStmt->fetchAll();
 }
 
+// For each past cycle, fetch the photos the user posted
+$pastPhotos = [];
+$photoStmt = $db->prepare("SELECT * FROM gallery WHERE cycle_id = ? AND user_id = ? ORDER BY created_at DESC");
+foreach ($pastCycles as $p) {
+    $photoStmt->execute([$p['cycle_id'], $userId]);
+    $pastPhotos[$p['cycle_id']] = $photoStmt->fetchAll();
+}
+
 // Compute whether each cycle still needs a photo upload:
 // true while fewer photos have been uploaded than zines received
 $needsPhotoMap = [];
 $galleryCountStmt = $db->prepare("SELECT COUNT(*) FROM gallery WHERE cycle_id = ? AND user_id = ?");
-foreach ($participations as $p) {
+foreach (array_merge($participations, $pastCycles) as $p) {
     $receivedCount = 0;
     foreach ($allPairings[$p['cycle_id']] ?? [] as $pairing) {
         if ($pairing['zine_received']) {
@@ -320,9 +336,10 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                 </section>
             <?php endif; ?>
             
-            <?php if (empty($participations) && empty($availableCycles)): ?>
+            <?php if (empty($participations) && empty($availableCycles) && empty($pastCycles)): ?>
                 <p class="empty-state">No exchange cycles are currently available. Check back later for new cycles!</p>
-            <?php elseif (!empty($participations)): ?>
+            <?php else: ?>
+                <?php if (!empty($participations)): ?>
                 <section class="participations">
                     <h2>My Participations</h2>
                     
@@ -429,6 +446,86 @@ $unseenAnnouncementCount = getUnseenAnnouncementCount($db, $userId);
                         </div>
                     <?php endforeach; ?>
                 </section>
+                <?php endif; ?>
+
+                <?php if (!empty($pastCycles)): ?>
+                <section class="past-cycles">
+                    <h2>Past Cycles</h2>
+                    <p class="section-description">Cycles you took part in. Expand to see your partner(s) and the photos you posted.</p>
+
+                    <?php foreach ($pastCycles as $p):
+                        $pairings = $allPairings[$p['cycle_id']] ?? [];
+                        $photos = $pastPhotos[$p['cycle_id']] ?? [];
+                        $needsPhoto = $needsPhotoMap[$p['cycle_id']] ?? false;
+                    ?>
+                        <details class="past-cycle"<?php echo $needsPhoto ? ' data-pending-photo' : ''; ?>>
+                            <summary>
+                                <span class="past-cycle-name"><?php echo htmlspecialchars($p['cycle_name']); ?></span>
+                                <span class="past-cycle-date"><?php echo date('F Y', strtotime($p['start_date'])); ?></span>
+                                <span class="past-cycle-count"><?php echo count($photos); ?> photo<?php echo count($photos) === 1 ? '' : 's'; ?></span>
+                                <?php if ($needsPhoto): ?>
+                                    <span class="badge-photo">photo pending</span>
+                                <?php endif; ?>
+                            </summary>
+                            <div class="past-cycle-body">
+                                <div class="partner-info">
+                                    <h4>Exchange Partner<?php echo count($pairings) === 1 ? '' : 's'; ?></h4>
+                                    <?php if (!empty($pairings)): ?>
+                                        <?php foreach ($pairings as $pairing): ?>
+                                            <p class="partner-line"><?php echo htmlspecialchars($pairing['partner_name']); ?><?php if ($pairing['partner_country']): ?> (<?php echo htmlspecialchars($pairing['partner_country']); ?>)<?php endif; ?></p>
+                                        <?php endforeach; ?>
+                                    <?php else: ?>
+                                        <p class="empty-state">No partner assigned.</p>
+                                    <?php endif; ?>
+                                </div>
+
+                                <div class="past-photos">
+                                    <h4>Photos I Posted</h4>
+                                    <?php if (!empty($photos)): ?>
+                                        <div class="gallery-grid gallery-grid--compact">
+                                            <?php foreach ($photos as $photo): ?>
+                                                <div class="gallery-item">
+                                                    <a href="<?php echo htmlspecialchars($photo['image_path']); ?>" target="_blank" rel="noopener">
+                                                        <img src="<?php echo htmlspecialchars($photo['image_path']); ?>" alt="<?php echo ucfirst(CONTENT_TYPE); ?> photo">
+                                                    </a>
+                                                    <div class="gallery-info">
+                                                        <?php if ($photo['caption']): ?>
+                                                            <p class="caption"><?php echo htmlspecialchars($photo['caption']); ?></p>
+                                                        <?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <p class="empty-state">No photo posted yet.</p>
+                                    <?php endif; ?>
+                                </div>
+
+                                <?php if ($needsPhoto): ?>
+                                    <div class="upload-section">
+                                        <h4>Upload Photo of Received <?php echo ucfirst(CONTENT_TYPE); ?></h4>
+                                        <form method="post" enctype="multipart/form-data" class="form">
+                                            <?php $csrf = generateCsrfToken(); ?>
+                                            <input type="hidden" name="csrf_token" value="<?php echo $csrf; ?>">
+                                            <input type="hidden" name="cycle_id" value="<?php echo $p['cycle_id']; ?>">
+                                            <div class="form-group">
+                                                <label for="photo_<?php echo $p['cycle_id']; ?>">Photo</label>
+                                                <input type="file" id="photo_<?php echo $p['cycle_id']; ?>" name="photo" accept="image/*" required>
+                                            </div>
+                                            <div class="form-group">
+                                                <label for="caption_<?php echo $p['cycle_id']; ?>">Caption (optional)</label>
+                                                <input type="text" id="caption_<?php echo $p['cycle_id']; ?>" name="caption">
+                                            </div>
+                                            <button type="submit" name="upload_photo" class="btn-small">Upload Photo</button>
+                                        </form>
+                                    </div>
+                                <?php endif; ?>
+                            </div>
+                        </details>
+                    <?php endforeach; ?>
+                </section>
+                <?php endif; ?>
+
         <!-- Contact Administrator Section -->
         <section class="contact-section">
             <div class="container">

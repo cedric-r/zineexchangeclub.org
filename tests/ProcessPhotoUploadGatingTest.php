@@ -1,11 +1,14 @@
 <?php
 /**
- * Test: process.php photo-upload gating with multiple pairings.
+ * Test: process.php photo-upload gating + past-cycles archive queries.
  * Mirrors the exact queries used by process.php.
  *
- * Scenario: closed cycle, user paired with 2 partners, received both,
- * uploads one photo -> cycle must STILL appear and offer an upload form
- * (one more photo owed). After uploading a second photo -> hidden.
+ * Scenario: closed cycle, user paired with 2 partners, received both.
+ * - The cycle appears under Past Cycles (collapsed archive), not under
+ *   "My Participations" (active cycles only).
+ * - The upload form is gated on photos < received, both in active and past.
+ * - Past Cycles includes users who confirmed OR were paired; excludes
+ *   interest-only (want_to_participate, no confirm, no pairing).
  */
 declare(strict_types=1);
 require_once __DIR__ . '/bootstrap.php';
@@ -20,23 +23,29 @@ $db->exec("INSERT INTO users (id, name, email, password, postal_address, country
 $db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (1, 1, 1, 1), (1, 2, 1, 1), (1, 3, 1, 1)");
 $db->exec("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id, zine_received) VALUES (1, 1, 2, 1), (1, 2, 1, 0), (1, 1, 3, 1), (1, 3, 1, 0)");
 
-// ── process.php main participation query (current version) ──
-$participationQuery = "
+// ── process.php active-only participation query ──
+$activeQuery = "
     SELECT cp.*, c.name as cycle_name, c.start_date, c.pairing_done, c.registration_open
     FROM cycle_participations cp
     JOIN cycles c ON cp.cycle_id = c.id
     WHERE cp.user_id = ?
-      AND (
-          c.status = 'active'
-          OR (c.status = 'closed'
-              AND EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1)
-              AND (SELECT COUNT(*) FROM gallery g WHERE g.cycle_id = cp.cycle_id AND g.user_id = cp.user_id)
-                  < (SELECT COUNT(*) FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id AND cp2.zine_received = 1))
-      )
+      AND c.status = 'active'
     ORDER BY c.start_date DESC
 ";
 
-function fetchParticipations(PDO $db, string $query, int $userId): array {
+// ── process.php past-cycles archive query ──
+$pastQuery = "
+    SELECT cp.*, c.name as cycle_name, c.start_date
+    FROM cycle_participations cp
+    JOIN cycles c ON cp.cycle_id = c.id
+    WHERE cp.user_id = ?
+      AND c.status = 'closed'
+      AND (cp.participation_confirmed = 1
+           OR EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id))
+    ORDER BY c.start_date DESC
+";
+
+function fetchRows(PDO $db, string $query, int $userId): array {
     $stmt = $db->prepare($query);
     $stmt->execute([$userId]);
     return $stmt->fetchAll();
@@ -54,37 +63,63 @@ function countGalleryPhotos(PDO $db, int $cycleId, int $userId): int {
     return (int)$stmt->fetchColumn();
 }
 
-// ── Step 1: no photos yet — cycle visible ──
-$participations = fetchParticipations($db, $participationQuery, 1);
-assert_equal('no photos: cycle visible', 1, count($participations));
+// ── Step 1: closed cycle must NOT appear in active participations ──
+assert_equal('closed cycle not in active participations', 0, count(fetchRows($db, $activeQuery, 1)));
+
+// ── Step 2: closed cycle appears in Past Cycles, photo pending (no uploads) ──
+$past = fetchRows($db, $pastQuery, 1);
+assert_equal('closed cycle in past cycles', 1, count($past));
 assert_equal('no photos: owes 2 photos', true, countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1));
 
-// ── Step 2: upload ONE photo (as Cedric did for Rob) — cycle must stay visible ──
+// ── Step 3: upload ONE photo — still in past cycles, still owes one ──
 $db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (1, 1, 'uploads/one.jpg', 'From Rob.')");
-$participations = fetchParticipations($db, $participationQuery, 1);
-assert_equal('one photo of two received: cycle STILL visible (the bug)', 1, count($participations));
+$past = fetchRows($db, $pastQuery, 1);
+assert_equal('one photo: still in past cycles (archive always shows)', 1, count($past));
 assert_equal('one photo of two received: still owes one', true, countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1));
 
-// Upload-form gate logic from process.php ($needsPhotoMap)
-$needsPhoto = countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1);
-assert_equal('upload form shown after first photo', true, $needsPhoto);
+// Photos in OTHER cycles must not leak into this cycle's count
+$db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (9, 'Other Cycle', '2025-01-01', 0, 1, 'closed')");
+$db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (9, 1, 1, 1)");
+$db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (9, 1, 'uploads/other.jpg', 'Different cycle.')");
+assert_equal('cross-cycle photo does not count', 1, countGalleryPhotos($db, 1, 1));
 
-// ── Step 3: upload SECOND photo — cycle now complete, hidden ──
+// Photos per past cycle: only own photos for that cycle
+$photoStmt = $db->prepare("SELECT * FROM gallery WHERE cycle_id = ? AND user_id = ? ORDER BY created_at DESC");
+$photoStmt->execute([1, 1]);
+$photos = $photoStmt->fetchAll();
+assert_equal('past photos: only cycle-1 photos (not cycle 0)', 1, count($photos));
+assert_equal('past photos: correct path', 'uploads/one.jpg', $photos[0]['image_path']);
+
+// ── Step 4: upload SECOND photo — archive still shows, no longer pending ──
 $db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (1, 1, 'uploads/two.jpg', 'From Kenneth.')");
-$participations = fetchParticipations($db, $participationQuery, 1);
-assert_equal('two photos for two received: cycle hidden', 0, count($participations));
+$needsPhoto = countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1);
+assert_equal('two photos for two received: no longer pending', false, $needsPhoto);
+$pastIds = array_column(fetchRows($db, $pastQuery, 1), 'cycle_id');
+assert_equal('fully photoed cycle still in past cycles', true, in_array(1, $pastIds));
 
-// Single-pairing sanity: partner Bob alone in another cycle
+// ── Membership rules ──
+// Single-pairing sanity: Bob alone in another cycle
 $db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (2, 'Cycle 2', '2026-02-01', 0, 1, 'closed')");
 $db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (2, 2, 1, 1)");
 $db->exec("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id, zine_received) VALUES (2, 2, 1, 1)");
-$bobVisible = fetchParticipations($db, $participationQuery, 2);
-assert_equal('single pairing, no photo: visible', 1, count($bobVisible));
-$db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (2, 2, 'uploads/bob.jpg', NULL)");
-assert_equal('single pairing, one photo: hidden', 0, count(fetchParticipations($db, $participationQuery, 2)));
+$bobIds = array_column(fetchRows($db, $pastQuery, 2), 'cycle_id');
+assert_equal('paired+confirmed user in past cycles', true, in_array(2, $bobIds));
 
-// No-received sanity: closed cycle where user received nothing stays hidden
+// Received nothing but confirmed + paired: still in past cycles
 $db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (3, 'Cycle 3', '2026-03-01', 0, 1, 'closed')");
 $db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (3, 3, 1, 1)");
 $db->exec("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id, zine_received) VALUES (3, 3, 1, 0)");
-assert_equal('received nothing: hidden regardless of photos', 0, count(fetchParticipations($db, $participationQuery, 3)));
+$carolIds = array_column(fetchRows($db, $pastQuery, 3), 'cycle_id');
+assert_equal('received nothing: still in past cycles (took part)', true, in_array(3, $carolIds));
+
+// Interest-only: wants_to_participate, NOT confirmed, NO pairing -> excluded
+$db->exec("INSERT INTO users (id, name, email, password, postal_address, country) VALUES (4, 'Dave', 'd@test.com', 'x', 'Addr 4', 'DE')");
+$db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (3, 4, 1, 0)");
+assert_equal('interest-only (no confirm, no pairing): excluded', 0, count(fetchRows($db, $pastQuery, 4)));
+
+// Active cycle stays in active participations, never in past
+$db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (4, 'Cycle 4', '2026-04-01', 1, 0, 'active')");
+$db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (4, 1, 1, 1)");
+assert_equal('active cycle in active participations', 1, count(fetchRows($db, $activeQuery, 1)));
+$pastIds = array_column(fetchRows($db, $pastQuery, 1), 'cycle_id');
+assert_equal('active cycle not in past cycles', false, in_array(4, $pastIds));
