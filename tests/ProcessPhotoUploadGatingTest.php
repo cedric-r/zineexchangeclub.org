@@ -6,7 +6,9 @@
  * Scenario: closed cycle, user paired with 2 partners, received both.
  * - The cycle appears under Past Cycles (collapsed archive), not under
  *   "My Participations" (active cycles only).
- * - The upload form is gated on photos < received, both in active and past.
+ * - ACTIVE cycles gate the upload form on photos < received.
+ * - PAST (closed) cycles gate the upload form on photos < pairings, so a user
+ *   who took part can still upload even if they never ticked "received".
  * - Past Cycles includes users who confirmed OR were paired; excludes
  *   interest-only (want_to_participate, no confirm, no pairing).
  */
@@ -63,19 +65,37 @@ function countGalleryPhotos(PDO $db, int $cycleId, int $userId): int {
     return (int)$stmt->fetchColumn();
 }
 
+function countPairings(PDO $db, int $cycleId, int $userId): int {
+    $stmt = $db->prepare("SELECT COUNT(*) FROM cycle_pairings WHERE cycle_id = ? AND user_id = ?");
+    $stmt->execute([$cycleId, $userId]);
+    return (int)$stmt->fetchColumn();
+}
+
+// process.php PAST-cycle gate: pairingCount > 0 && photos < pairingCount
+function pastNeedsPhoto(PDO $db, int $cycleId, int $userId): bool {
+    $pairingCount = countPairings($db, $cycleId, $userId);
+    return $pairingCount > 0 && countGalleryPhotos($db, $cycleId, $userId) < $pairingCount;
+}
+
+// process.php ACTIVE-cycle gate: received > 0 && photos < received
+function activeNeedsPhoto(PDO $db, int $cycleId, int $userId): bool {
+    $receivedCount = countReceivedPairings($db, $cycleId, $userId);
+    return $receivedCount > 0 && countGalleryPhotos($db, $cycleId, $userId) < $receivedCount;
+}
+
 // ── Step 1: closed cycle must NOT appear in active participations ──
 assert_equal('closed cycle not in active participations', 0, count(fetchRows($db, $activeQuery, 1)));
 
 // ── Step 2: closed cycle appears in Past Cycles, photo pending (no uploads) ──
 $past = fetchRows($db, $pastQuery, 1);
 assert_equal('closed cycle in past cycles', 1, count($past));
-assert_equal('no photos: owes 2 photos', true, countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1));
+assert_equal('no photos: past gate owes 2', true, pastNeedsPhoto($db, 1, 1));
 
 // ── Step 3: upload ONE photo — still in past cycles, still owes one ──
 $db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (1, 1, 'uploads/one.jpg', 'From Rob.')");
 $past = fetchRows($db, $pastQuery, 1);
 assert_equal('one photo: still in past cycles (archive always shows)', 1, count($past));
-assert_equal('one photo of two received: still owes one', true, countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1));
+assert_equal('one photo of two: past gate still owes one', true, pastNeedsPhoto($db, 1, 1));
 
 // Photos in OTHER cycles must not leak into this cycle's count
 $db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (9, 'Other Cycle', '2025-01-01', 0, 1, 'closed')");
@@ -92,8 +112,8 @@ assert_equal('past photos: correct path', 'uploads/one.jpg', $photos[0]['image_p
 
 // ── Step 4: upload SECOND photo — archive still shows, no longer pending ──
 $db->exec("INSERT INTO gallery (cycle_id, user_id, image_path, caption) VALUES (1, 1, 'uploads/two.jpg', 'From Kenneth.')");
-$needsPhoto = countGalleryPhotos($db, 1, 1) < countReceivedPairings($db, 1, 1);
-assert_equal('two photos for two received: no longer pending', false, $needsPhoto);
+$needsPhoto = pastNeedsPhoto($db, 1, 1);
+assert_equal('two photos for two pairings: no longer pending', false, $needsPhoto);
 $pastIds = array_column(fetchRows($db, $pastQuery, 1), 'cycle_id');
 assert_equal('fully photoed cycle still in past cycles', true, in_array(1, $pastIds));
 
@@ -123,3 +143,18 @@ $db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_partici
 assert_equal('active cycle in active participations', 1, count(fetchRows($db, $activeQuery, 1)));
 $pastIds = array_column(fetchRows($db, $pastQuery, 1), 'cycle_id');
 assert_equal('active cycle not in past cycles', false, in_array(4, $pastIds));
+
+// ── Lauri regression: took part, sent, but received flag never ticked ──
+// (She received the postcard very late; the inbound item was never marked
+//  received, so the old received-count gate hid the upload form entirely.)
+$db->exec("INSERT INTO cycles (id, name, start_date, registration_open, pairing_done, status) VALUES (5, 'Cycle 5', '2026-05-01', 0, 1, 'closed')");
+$db->exec("INSERT INTO cycle_participations (cycle_id, user_id, wants_to_participate, participation_confirmed) VALUES (5, 5, 1, 1)");
+$db->exec("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id, zine_sent, zine_received) VALUES (5, 5, 2, 1, 0)");
+$lauriIds = array_column(fetchRows($db, $pastQuery, 5), 'cycle_id');
+assert_equal('lauri: closed cycle in past cycles', true, in_array(5, $lauriIds));
+assert_equal('lauri: received flag is 0 (never ticked)', 0, countReceivedPairings($db, 5, 5));
+assert_equal('lauri: past gate allows upload despite received=0 (the bug)', true, pastNeedsPhoto($db, 5, 5));
+assert_equal('lauri: no photo uploaded yet', 0, countGalleryPhotos($db, 5, 5));
+
+// The active-cycle gate stays strict: received=0 on an active cycle -> no form
+assert_equal('active gate stays strict (received=0 -> no form)', false, activeNeedsPhoto($db, 5, 5));

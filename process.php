@@ -230,20 +230,32 @@ foreach ($pastCycles as $p) {
     $pastPhotos[$p['cycle_id']] = $photoStmt->fetchAll();
 }
 
-// Compute whether each cycle still needs a photo upload:
-// true while fewer photos have been uploaded than zines received
+// Compute whether each cycle still needs a photo upload.
+// - Active cycles: gate on number received (you can only photograph what you've
+//   actually reported receiving).
+// - Past (closed) cycles: gate on number of pairings, so anyone who took part
+//   can still add a photo even if the received flag was never ticked (e.g. a
+//   user who reported sending but never marked the inbound item received).
 $needsPhotoMap = [];
 $galleryCountStmt = $db->prepare("SELECT COUNT(*) FROM gallery WHERE cycle_id = ? AND user_id = ?");
-foreach (array_merge($participations, $pastCycles) as $p) {
+foreach ($participations as $p) {
     $receivedCount = 0;
     foreach ($allPairings[$p['cycle_id']] ?? [] as $pairing) {
         if ($pairing['zine_received']) {
             $receivedCount++;
         }
     }
-    if ($receivedCount > 0) {
+    $needsPhotoMap[$p['cycle_id']] = $receivedCount > 0;
+    if ($needsPhotoMap[$p['cycle_id']]) {
         $galleryCountStmt->execute([$p['cycle_id'], $userId]);
         $needsPhotoMap[$p['cycle_id']] = (int)$galleryCountStmt->fetchColumn() < $receivedCount;
+    }
+}
+foreach ($pastCycles as $p) {
+    $pairingCount = count($allPairings[$p['cycle_id']] ?? []);
+    if ($pairingCount > 0) {
+        $galleryCountStmt->execute([$p['cycle_id'], $userId]);
+        $needsPhotoMap[$p['cycle_id']] = (int)$galleryCountStmt->fetchColumn() < $pairingCount;
     } else {
         $needsPhotoMap[$p['cycle_id']] = false;
     }
