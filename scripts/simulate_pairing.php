@@ -278,6 +278,86 @@ function simulateGeographicProximity(array $participants, array $map, array $ali
     return $bestPairs ?? [];
 }
 
+function simulateContinentNovelty(array $participants, array $map, array $aliases, array $already): array {
+    $bestPairs = null;
+    $bestScore = -1;
+    $total = count($participants);
+    $maxScore = (int)($total / 2) * 3;
+    $maxIterations = max(50, min(500, count($participants) * 10));
+
+    for ($iter = 0; $iter < $maxIterations; $iter++) {
+        shuffle($participants);
+        $remaining = $participants;
+        $pairs = [];
+        $score = 0;
+
+        while (count($remaining) >= 2) {
+            $p1 = array_shift($remaining);
+            $bestIdx = -1;
+            $bestMatch = -1;
+
+            foreach ($remaining as $idx => $p2) {
+                $s = pairScoreNovelty(
+                    $p1['country'],
+                    $p2['country'],
+                    haveBeenPairedSim((int)$p1['user_id'], (int)$p2['user_id'], $already),
+                    $map,
+                    $aliases
+                );
+                if ($s > $bestMatch) {
+                    $bestMatch = $s;
+                    $bestIdx = $idx;
+                }
+            }
+
+            $p2 = array_splice($remaining, $bestIdx, 1)[0];
+            $pairs[] = [(int)$p1['user_id'], (int)$p2['user_id']];
+            $score += $bestMatch;
+        }
+
+        if ($score > $bestScore) { $bestScore = $score; $bestPairs = $pairs; }
+        if ($score === $maxScore) break;
+    }
+
+    return $bestPairs ?? [];
+}
+
+/**
+ * Continent Novelty scoring: avoiding repeats is primary, same-continent
+ * is a secondary preference. Mirrors ContinentNoveltyAlgorithm::pairScore.
+ */
+function pairScoreNovelty(string $c1, string $c2, bool $pairedBefore, array $map, array $aliases): int {
+    $r1 = getRegion($c1, $map, $aliases);
+    $r2 = getRegion($c2, $map, $aliases);
+    $sameContinent = $r1 !== null && $r2 !== null && $r1 === $r2;
+
+    if (!$pairedBefore && $sameContinent) return 3;
+    if (!$pairedBefore) return 2;
+    if ($sameContinent) return 1;
+    return 0;
+}
+
+function haveBeenPairedSim(int $a, int $b, array $already): bool {
+    if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+    return isset($already["$a-$b"]);
+}
+
+/**
+ * Load the set of unordered "a-b" pairs already paired in any other cycle.
+ */
+function loadHistoricalPairingsForSim(PDO $db, int $cycleId): array {
+    $already = [];
+    $stmt = $db->prepare("SELECT user_id, partner_id FROM cycle_pairings WHERE cycle_id != ?");
+    $stmt->execute([$cycleId]);
+    foreach ($stmt->fetchAll() as $row) {
+        $a = (int)$row['user_id'];
+        $b = (int)$row['partner_id'];
+        if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+        $already["$a-$b"] = true;
+    }
+    return $already;
+}
+
 // ── User name helper ───────────────────────────────────────────────
 
 function userName(int $id, array $users): string {
@@ -340,6 +420,9 @@ foreach ($cycles as $cycle) {
             $p['zine_format'] ?: '—', $i + 1);
     }
 
+    // Historical pairings (needed by continent_novelty) — read-only
+    $already = loadHistoricalPairingsForSim($db, $cycleId);
+
     // Run each algorithm
     foreach ($algorithms as $algoName) {
         echo "\n  ┌─ Algorithm: {$algoName}\n";
@@ -354,6 +437,7 @@ foreach ($cycles as $cycle) {
             'zine_type'             => simulateZineType($participants),
             'country_zine_type'     => simulateCountryZineType($participants, $countryAliases),
             'geographic_proximity'  => simulateGeographicProximity($participants, $regionMap, $countryAliases),
+            'continent_novelty'     => simulateContinentNovelty($participants, $regionMap, $countryAliases, $already),
             default                 => [],
         };
 
