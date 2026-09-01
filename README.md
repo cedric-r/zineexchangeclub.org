@@ -30,7 +30,7 @@ The system follows a classic LAMP-stack architecture:
 - **Web Layer**: Apache with `.htaccess` security headers, file protections, HTTPS redirect, Content-Security-Policy, and URL rewriting
 - **Security Layer**: PHP sessions with CSRF tokens, `session_regenerate_id()` on login, question-based CAPTCHA, IP-rate-limited login/reset forms, stored XSS prevention via `ENT_QUOTES`, SMTP dot-stuffing, and country-normalized pairing
 - **Public Pages**: User-facing PHP pages for registration, login, cycle participation, exchange tracking, gallery, and announcements
-- **Admin Dashboard**: Admin-only pages for cycle management, participant pairing (6 plugin-based algorithms with country normalization), manual pairing of leftover participants, announcement broadcasting, and gallery moderation
+- **Admin Dashboard**: Admin-only pages for cycle management, participant pairing (7 plugin-based algorithms with country normalization), manual pairing of leftover participants, announcement broadcasting, and gallery moderation
 - **Core Library**: Shared PHP includes for authentication (`auth.php`), SMTP email (`email.php` via `fsockopen`), pairing algorithms (`pairing_algorithms.php`), CAPTCHA verification, and utility functions
 - **Background Services**: Cron-driven CLI scripts for posting/receiving reminders and batch updates
 - **Email Templates**: HTML email templates for every stage of the exchange cycle
@@ -78,7 +78,7 @@ define('SITE_TITLE', 'Zine Exchange Club');
 define('CONTENT_TYPE', 'zine'); // Type of content exchanged: 'zine' or 'postcard'
 
 // Pairing algorithm configuration
-define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity'
+define('PAIRING_ALGORITHM', 'random'); // Options: 'country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity', 'continent_novelty'
 
 // Admin configuration
 define('ADMIN_EMAIL', 'admin@zineexchangeclub.org');
@@ -212,7 +212,7 @@ zineexchangeclub.org/
 │   ├── footer.php            # Shared page footer
 │   ├── functions.php         # Announcement helper functions
 │   ├── header.php            # Shared page header
-│   └── pairing_algorithms.php # 6 algorithms + factory + country normalization
+│   └── pairing_algorithms.php # 7 algorithms + factory + country normalization
 ├── js/
 │   └── captcha.js            # Frontend captcha verification with AJAX
 ├── scripts/
@@ -257,7 +257,7 @@ zineexchangeclub.org/
 
 ### Pairing Algorithms
 
-The system features a plugin-based pairing system with 6 algorithms. Configure the active algorithm in `config.php`:
+The system features a plugin-based pairing system with 7 algorithms. Configure the active algorithm in `config.php`:
 
 ```php
 define('PAIRING_ALGORITHM', 'geographic_proximity');
@@ -296,6 +296,15 @@ define('PAIRING_ALGORITHM', 'geographic_proximity');
    - Logs pairing quality stats (same-country / same-region / cross-region counts)
    - Falls back to best greedy result when all pairs are cross-region (avoids blind random fallback)
 
+7. **Continent Novelty**
+   - Pairs at the **continent** level (same continent = preferred) while **avoiding re-pairing people who have already been paired in previous cycles** — this directly prevents the same two people from being matched together over and over
+   - Scoring per candidate pair: same continent + never paired = 3, different continent + never paired = 2, same continent + already paired = 1, different continent + already paired = 0
+   - Avoiding repeats is the primary goal; same-continent preference is a secondary tiebreaker (for shipping ease)
+   - Historical pairings are read from the `cycle_pairings` table across all previous cycles
+   - Greedy matching with random-restart optimization (50–500 iterations)
+   - Falls back to a repeat pair only when no alternative exists (e.g. only 2 participants who have already swapped)
+   - Logs pairing quality stats (same-continent / cross-continent / repeat counts)
+
 #### Adding New Algorithms:
 New pairing algorithms can be added by implementing the `PairingAlgorithm` interface in `includes/pairing_algorithms.php` and registering in the factory.
 
@@ -306,7 +315,7 @@ Preview what each algorithm would produce without modifying the database or send
 # Simulate active cycles with configured algorithm
 php scripts/simulate_pairing.php
 
-# Simulate all 6 algorithms across all cycles
+# Simulate all 7 algorithms across all cycles
 php scripts/simulate_pairing.php --all
 
 # Simulate a specific cycle with a specific algorithm
@@ -318,7 +327,7 @@ After auto-pairing, if an odd participant count left users unpaired, the admin d
 
 ### Country Name Normalization
 
-All country-aware algorithms (Country Priority, Country + Zine Type, Geographic Proximity) normalize country names via a 69-entry alias map before comparison. This ensures variants like these are treated as the same country:
+All country-aware algorithms (Country Priority, Country + Zine Type, Geographic Proximity, Continent Novelty) normalize country names via a 69-entry alias map before comparison. This ensures variants like these are treated as the same country:
 
 | Variant | Canonical |
 |---------|-----------|

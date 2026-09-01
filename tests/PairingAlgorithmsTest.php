@@ -2,7 +2,7 @@
 /**
  * Tests for includes/pairing_algorithms.php
  *
- * Covers: PairingAlgorithmFactory, all 6 pairing algorithms,
+ * Covers: PairingAlgorithmFactory, all 7 pairing algorithms,
  *         GeographicProximityAlgorithm private methods (via reflection),
  *         and pairParticipants().
  */
@@ -88,6 +88,7 @@ assert_true('factory lists sequential', in_array('sequential', $available));
 assert_true('factory lists zine_type', in_array('zine_type', $available));
 assert_true('factory lists country_zine_type', in_array('country_zine_type', $available));
 assert_true('factory lists geographic_proximity', in_array('geographic_proximity', $available));
+assert_true('factory lists continent_novelty', in_array('continent_novelty', $available));
 
 assert_true('factory returns CountryPriorityAlgorithm instance',
     PairingAlgorithmFactory::getAlgorithm('country_priority') instanceof CountryPriorityAlgorithm);
@@ -97,6 +98,8 @@ assert_true('factory returns SequentialAlgorithm instance',
     PairingAlgorithmFactory::getAlgorithm('sequential') instanceof SequentialAlgorithm);
 assert_true('factory returns GeographicProximityAlgorithm instance',
     PairingAlgorithmFactory::getAlgorithm('geographic_proximity') instanceof GeographicProximityAlgorithm);
+assert_true('factory returns ContinentNoveltyAlgorithm instance',
+    PairingAlgorithmFactory::getAlgorithm('continent_novelty') instanceof ContinentNoveltyAlgorithm);
 
 assert_throws('factory throws for unknown algorithm',
     fn() => PairingAlgorithmFactory::getAlgorithm('nonexistent_algo'),
@@ -106,7 +109,7 @@ assert_throws('factory throws for unknown algorithm',
 //  Algorithm: insufficient participants (< 2) → return false
 // ════════════════════════════════════════════════════════════════════
 
-$algoNames = ['country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity'];
+$algoNames = ['country_priority', 'random', 'sequential', 'zine_type', 'country_zine_type', 'geographic_proximity', 'continent_novelty'];
 
 foreach ($algoNames as $name) {
     // Fresh cycle with 0 participants
@@ -371,6 +374,104 @@ $algo = new GeographicProximityAlgorithm();
 $result = $algo->pair($db, $cycleId);
 assert_true('GeographicProximityAlgorithm falls back for cross-region participants', $result === true);
 assertPairingsValid('GeographicProximityAlgorithm cross-region fallback', $db, $cycleId, $gpFallbackUsers);
+
+// ════════════════════════════════════════════════════════════════════
+//  ContinentNoveltyAlgorithm — continent level + avoids repeat pairings
+// ════════════════════════════════════════════════════════════════════
+
+// Helper: get the set of unordered pairs for a cycle as "a-b" keys.
+$getPairSet = function (PDO $db, int $cycleId): array {
+    $stmt = $db->prepare("SELECT user_id, partner_id FROM cycle_pairings WHERE cycle_id = ?");
+    $stmt->execute([$cycleId]);
+    $set = [];
+    foreach ($stmt->fetchAll() as $row) {
+        $a = (int)$row['user_id']; $b = (int)$row['partner_id'];
+        if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+        $set["$a-$b"] = true;
+    }
+    return $set;
+};
+
+// ── Basic: prefers same continent when all participants are novel ──
+$cycleId = insertTestCycle($db);
+$cnUsers = [];
+foreach (['France', 'Germany', 'Spain', 'Italy'] as $i => $country) {
+    $id = insertTestUser($db, ['email' => "cn-{$i}@pair-test.local", 'country' => $country]);
+    $cnUsers[] = $id;
+    addParticipation($db, $cycleId, $id);
+}
+
+$algo = new ContinentNoveltyAlgorithm();
+$result = $algo->pair($db, $cycleId);
+assert_true('ContinentNoveltyAlgorithm pairs 4 participants', $result === true);
+assertPairingsValid('ContinentNoveltyAlgorithm 4', $db, $cycleId, $cnUsers);
+
+// Same-continent preference: each pair should be within the same continent.
+$stmt = $db->prepare("
+    SELECT cp1.user_id, cp1.partner_id, u1.country AS c1, u2.country AS c2
+    FROM cycle_pairings cp1
+    JOIN users u1 ON cp1.user_id = u1.id
+    JOIN users u2 ON cp1.partner_id = u2.id
+    WHERE cp1.cycle_id = ?
+");
+$stmt->execute([$cycleId]);
+foreach ($stmt->fetchAll() as $p) {
+    $r1 = GeographicProximityAlgorithm::getRegion($p['c1']);
+    $r2 = GeographicProximityAlgorithm::getRegion($p['c2']);
+    assert_true("ContinentNovelty pair {$p['user_id']}-{$p['partner_id']}: same continent", $r1 !== null && $r1 === $r2);
+}
+
+// ── Avoids repeat pairings across cycles ──────────────────────────
+// Run a first cycle with 4 same-continent users, then a second cycle
+// with the same users. The second cycle must NOT reproduce any of the
+// first cycle's pairs.
+$cycleA = insertTestCycle($db);
+$repeatUsers = [];
+foreach (['France', 'Germany', 'Spain', 'Italy'] as $i => $country) {
+    $id = insertTestUser($db, ['email' => "cn-rep-{$i}@pair-test.local", 'country' => $country]);
+    $repeatUsers[] = $id;
+    addParticipation($db, $cycleA, $id);
+}
+$algo = new ContinentNoveltyAlgorithm();
+assert_true('ContinentNovelty cycle A pairs', $algo->pair($db, $cycleA) === true);
+$setA = $getPairSet($db, $cycleA);
+
+$cycleB = insertTestCycle($db);
+foreach ($repeatUsers as $uid) {
+    addParticipation($db, $cycleB, $uid);
+}
+$algo = new ContinentNoveltyAlgorithm();
+assert_true('ContinentNovelty cycle B pairs', $algo->pair($db, $cycleB) === true);
+$setB = $getPairSet($db, $cycleB);
+$overlap = array_intersect_key($setA, $setB);
+assert_true('ContinentNovelty avoids repeat pairings across cycles', count($overlap) === 0);
+
+// ── Repeat allowed only when unavoidable (just 2 participants) ────
+$cycleOnly = insertTestCycle($db);
+$only1 = insertTestUser($db, ['email' => 'cn-only1@pair-test.local', 'country' => 'France']);
+$only2 = insertTestUser($db, ['email' => 'cn-only2@pair-test.local', 'country' => 'Germany']);
+addParticipation($db, $cycleOnly, $only1);
+addParticipation($db, $cycleOnly, $only2);
+$algo = new ContinentNoveltyAlgorithm();
+assert_true('ContinentNovelty pairs 2 participants (first time)', $algo->pair($db, $cycleOnly) === true);
+
+$cycleOnly2 = insertTestCycle($db);
+addParticipation($db, $cycleOnly2, $only1);
+addParticipation($db, $cycleOnly2, $only2);
+$algo = new ContinentNoveltyAlgorithm();
+assert_true('ContinentNovelty re-pairs 2 participants when no alternative', $algo->pair($db, $cycleOnly2) === true);
+
+// ── All cross-continent, never paired → still pairs (novelty 2 each) ──
+$cycleCross = insertTestCycle($db);
+$crossUsers = [];
+foreach (['Japan', 'Brazil', 'Australia', 'Kenya'] as $i => $country) {
+    $id = insertTestUser($db, ['email' => "cn-cross-{$i}@pair-test.local", 'country' => $country]);
+    $crossUsers[] = $id;
+    addParticipation($db, $cycleCross, $id);
+}
+$algo = new ContinentNoveltyAlgorithm();
+assert_true('ContinentNovelty pairs across continents when never paired', $algo->pair($db, $cycleCross) === true);
+assertPairingsValid('ContinentNovelty cross-continent', $db, $cycleCross, $crossUsers);
 
 // ════════════════════════════════════════════════════════════════════
 //  pairParticipants() — wraps algorithm + email sending

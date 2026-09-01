@@ -604,8 +604,164 @@ class GeographicProximityAlgorithm implements PairingAlgorithm {
         return 0;
     }
 
-    private function getRegion(string $country): ?string {
+    public static function getRegion(string $country): ?string {
         return self::$regionMap[self::normalizeCountry($country)] ?? null;
+    }
+}
+
+/**
+ * Continent Novelty Algorithm
+ * Pairs participants at the continent level while avoiding re-pairing
+ * people who have already been paired in previous cycles.
+ *
+ * Scoring per candidate pair (higher is better):
+ *   3  same continent     + never paired before
+ *   2  different continent + never paired before
+ *   1  same continent     + already paired in a previous cycle
+ *   0  different continent + already paired
+ *
+ * Avoiding repeat pairings is the primary goal (this is what keeps people
+ * from being matched with the same partner again and again); keeping pairs
+ * within the same continent is a secondary preference for shipping ease.
+ * Uses greedy matching with random-restart optimization, like
+ * GeographicProximityAlgorithm.
+ */
+class ContinentNoveltyAlgorithm implements PairingAlgorithm {
+    public function pair($db, $cycleId): bool {
+        $stmt = $db->prepare("
+            SELECT cp.user_id, u.country
+            FROM cycle_participations cp
+            JOIN users u ON cp.user_id = u.id
+            WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1
+        ");
+        $stmt->execute([$cycleId]);
+        $participants = $stmt->fetchAll();
+
+        if (count($participants) < 2) {
+            return false;
+        }
+
+        // Historical pairings from all previous cycles (unordered pairs).
+        $already = $this->loadHistoricalPairings($db, $cycleId);
+
+        $bestPairs = null;
+        $bestScore = -1;
+
+        $totalParticipants = count($participants);
+        $maxPossibleScore = (int)($totalParticipants / 2) * 3;
+        $maxIterations = max(50, min(500, count($participants) * 10));
+
+        for ($iteration = 0; $iteration < $maxIterations; $iteration++) {
+            shuffle($participants);
+
+            $remaining = $participants;
+            $pairs = [];
+            $score = 0;
+
+            while (count($remaining) >= 2) {
+                $p1 = array_shift($remaining);
+
+                $bestMatchIdx = -1;
+                $bestMatchScore = -1;
+
+                foreach ($remaining as $idx => $p2) {
+                    $s = $this->pairScore(
+                        $p1['country'],
+                        $p2['country'],
+                        $this->haveBeenPaired((int)$p1['user_id'], (int)$p2['user_id'], $already)
+                    );
+                    if ($s > $bestMatchScore) {
+                        $bestMatchScore = $s;
+                        $bestMatchIdx = $idx;
+                    }
+                }
+
+                $p2 = array_splice($remaining, $bestMatchIdx, 1)[0];
+                $pairs[] = [$p1['user_id'], $p2['user_id'], $p1['country'], $p2['country']];
+                $score += $bestMatchScore;
+            }
+
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $bestPairs = $pairs;
+            }
+
+            // All pairs are same-continent and novel — no need to keep iterating
+            if ($score === $maxPossibleScore) {
+                break;
+            }
+        }
+
+        // Save the best pairing found
+        foreach ($bestPairs as $pair) {
+            $user1 = $pair[0];
+            $user2 = $pair[1];
+            $stmt = $db->prepare("INSERT INTO cycle_pairings (cycle_id, user_id, partner_id) VALUES (?, ?, ?)");
+            $stmt->execute([$cycleId, $user1, $user2]);
+            $stmt->execute([$cycleId, $user2, $user1]);
+        }
+
+        $stmt = $db->prepare("UPDATE cycles SET pairing_done = 1 WHERE id = ?");
+        $stmt->execute([$cycleId]);
+
+        // Log pairing quality stats
+        $sameContinent = 0; $crossContinent = 0; $repeat = 0;
+        foreach ($bestPairs as $pair) {
+            if ($this->haveBeenPaired((int)$pair[0], (int)$pair[1], $already)) {
+                $repeat++;
+            }
+            $r1 = GeographicProximityAlgorithm::getRegion($pair[2] ?? '');
+            $r2 = GeographicProximityAlgorithm::getRegion($pair[3] ?? '');
+            if ($r1 !== null && $r1 === $r2) {
+                $sameContinent++;
+            } else {
+                $crossContinent++;
+            }
+        }
+        error_log("[ContinentNoveltyAlgorithm] Cycle {$cycleId}: {$sameContinent} same-continent, {$crossContinent} cross-continent, {$repeat} repeat pairs");
+
+        // Check for unpaired participant (odd count)
+        $checkStmt = $db->prepare("SELECT COUNT(*) FROM cycle_participations cp WHERE cp.cycle_id = ? AND cp.participation_confirmed = 1 AND cp.wants_to_participate = 1 AND NOT EXISTS (SELECT 1 FROM cycle_pairings cp2 WHERE cp2.cycle_id = cp.cycle_id AND cp2.user_id = cp.user_id)");
+        $checkStmt->execute([$cycleId]);
+        $unpaired = (int)$checkStmt->fetchColumn();
+        if ($unpaired > 0) {
+            error_log("[" . (new ReflectionClass($this))->getShortName() . "] {$unpaired} participant(s) left unpaired in cycle {$cycleId} (odd count).");
+        }
+
+        return true;
+    }
+
+    /**
+     * Load the set of unordered pairs that have already been paired in
+     * previous cycles (excluding the current cycle).
+     */
+    private function loadHistoricalPairings(PDO $db, int $cycleId): array {
+        $already = [];
+        $stmt = $db->prepare("SELECT user_id, partner_id FROM cycle_pairings WHERE cycle_id != ?");
+        $stmt->execute([$cycleId]);
+        foreach ($stmt->fetchAll() as $row) {
+            $a = (int)$row['user_id'];
+            $b = (int)$row['partner_id'];
+            if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+            $already[$a . '-' . $b] = true;
+        }
+        return $already;
+    }
+
+    private function haveBeenPaired(int $a, int $b, array $already): bool {
+        if ($a > $b) { $tmp = $a; $a = $b; $b = $tmp; }
+        return isset($already[$a . '-' . $b]);
+    }
+
+    private function pairScore(string $country1, string $country2, bool $pairedBefore): int {
+        $r1 = GeographicProximityAlgorithm::getRegion($country1);
+        $r2 = GeographicProximityAlgorithm::getRegion($country2);
+        $sameContinent = $r1 !== null && $r2 !== null && $r1 === $r2;
+
+        if (!$pairedBefore && $sameContinent) return 3;
+        if (!$pairedBefore) return 2;
+        if ($sameContinent) return 1;
+        return 0;
     }
 }
 
@@ -620,6 +776,7 @@ class PairingAlgorithmFactory {
         'zine_type' => ZineTypeAlgorithm::class,
         'country_zine_type' => CountryZineTypeAlgorithm::class,
         'geographic_proximity' => GeographicProximityAlgorithm::class,
+        'continent_novelty' => ContinentNoveltyAlgorithm::class,
     ];
     
     /**
