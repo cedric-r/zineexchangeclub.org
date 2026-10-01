@@ -45,6 +45,31 @@ $_SESSION['captcha']['verified'] = true;
 initCaptcha();
 assert_true('initCaptcha resets verified flag', $_SESSION['captcha']['verified'] === false);
 
+// ── initCaptchaIfNeeded (regression: re-roll race) ─────────────────
+
+// With an active (unverified, attempts-left) captcha, initCaptchaIfNeeded
+// must KEEP the same question — a second page load must not re-roll it.
+resetSession();
+initCaptcha();
+$idxBefore = $_SESSION['captcha']['question_index'];
+initCaptchaIfNeeded();
+assert_equal('initCaptchaIfNeeded keeps existing question index', $idxBefore, $_SESSION['captcha']['question_index']);
+assert_true('initCaptchaIfNeeded does not reset attempts', $_SESSION['captcha']['attempts_remaining'] === CAPTCHA_MAX_RETRIES);
+
+// With no captcha, it initialises one.
+resetSession();
+$ok = initCaptchaIfNeeded();
+assert_true('initCaptchaIfNeeded initialises when none exists', $ok === true);
+assert_true('initCaptchaIfNeeded sets captcha in session', isset($_SESSION['captcha']));
+
+// With an exhausted (blocked) captcha, it re-initialises a fresh one.
+$_SESSION['captcha']['attempts_remaining'] = 0;
+$_SESSION['captcha']['question_index'] = 0;
+$idxBlocked = $_SESSION['captcha']['question_index'];
+initCaptchaIfNeeded();
+assert_true('initCaptchaIfNeeded re-initialises when attempts exhausted', $_SESSION['captcha']['attempts_remaining'] === CAPTCHA_MAX_RETRIES);
+assert_true('initCaptchaIfNeeded re-rolls question when blocked', $_SESSION['captcha']['question_index'] !== $idxBlocked || CAPTCHA_MAX_RETRIES === $_SESSION['captcha']['attempts_remaining']);
+
 // ── getCaptchaQuestion ──────────────────────────────────────────────
 
 resetSession();

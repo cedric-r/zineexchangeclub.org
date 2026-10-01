@@ -28,6 +28,23 @@ function initCaptcha() {
     return true;
 }
 
+/**
+ * Initialise a captcha only when needed. Keeps an already-active question
+ * (one with attempts left) so a second page load / tab cannot re-roll the
+ * question the user is looking at — previously a reload between page render
+ * and submit made the displayed question differ from the session one, and
+ * correct answers were rejected as "Incorrect answer".
+ *
+ * Re-initialises only when no captcha exists yet or the current one is
+ * exhausted (blocked) so a reload still grants a fresh question.
+ */
+function initCaptchaIfNeeded() {
+    if (isset($_SESSION['captcha']) && ($_SESSION['captcha']['attempts_remaining'] ?? 0) > 0) {
+        return true;
+    }
+    return initCaptcha();
+}
+
 function getCaptchaQuestion() {
     if (!isset($_SESSION['captcha']) || !isset($_SESSION['captcha']['question_index'])) {
         return null;

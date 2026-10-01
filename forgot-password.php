@@ -67,9 +67,10 @@ if ($rateLimited) {
 }
 }
 
-// Fresh captcha question on every page load; preserve state during POST for verification
+// Show a captcha question on page load; preserve state during POST for verification.
+// Keeps an already-active question so a reload/second tab doesn't re-roll it under the user.
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    initCaptcha();
+    initCaptchaIfNeeded();
 }
 $captchaData = getCaptchaQuestion();
 ?>
